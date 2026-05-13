@@ -18,7 +18,7 @@ export const register = async (req, res) => {
 
         const user = result.rows[0];
         const token = generateToken(user.id);
-        
+
         res.status(201).json({ user, token });
     } catch (err) {
         if (err.code === '23505') { // unique violation
@@ -46,7 +46,7 @@ export const login = async (req, res) => {
 
         const token = generateToken(user.id);
         delete user.password_hash;
-        
+
         res.json({ user, token });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });

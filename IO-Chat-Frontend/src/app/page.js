@@ -19,6 +19,10 @@ export default function IOChatApp() {
   const [inputText, setInputText] = useState("");
   const [socket, setSocket] = useState(null);
 
+  // Search States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+
   // Auth Layout States
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -139,6 +143,37 @@ export default function IOChatApp() {
     setInputText("");
   };
 
+  const handleSearchUsers = async (q) => {
+    setSearchQuery(q);
+    if (!q.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/auth/search?q=${q}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSearchResults(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startChat = async (targetUserId) => {
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/chats/private`, { targetUserId }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await fetchChats();
+      setActiveChatId(res.data.id);
+      setSearchQuery("");
+      setSearchResults([]);
+    } catch (err) {
+      console.error("Error starting chat:", err);
+      fetchChats();
+    }
+  };
+
   if (!user) {
     return (
       <div className={`flex items-center justify-center h-screen bg-gray-100 ${isDarkMode ? 'dark:bg-[#121212]' : ''}`}>
@@ -207,7 +242,43 @@ export default function IOChatApp() {
         </div>
         
         {/* --- 3. MAPPING DAFTAR KONTAK --- */}
+        <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+          <input 
+            type="text" 
+            placeholder="Search users to chat..." 
+            value={searchQuery}
+            onChange={(e) => handleSearchUsers(e.target.value)}
+            className="w-full p-2 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500"
+          />
+        </div>
+
         <div className="flex-1 overflow-y-auto">
+          {/* SEARCH RESULTS */}
+          {searchResults.length > 0 && (
+            <div className="mb-2">
+              <h4 className="px-4 py-2 text-xs font-bold text-gray-500 uppercase dark:text-gray-400 bg-gray-50 dark:bg-[#1a1a1a]">Search Results</h4>
+              {searchResults.map(sUser => (
+                <div 
+                  key={`search-${sUser.id}`}
+                  onClick={() => startChat(sUser.id)}
+                  className="flex items-center gap-3 p-3 transition-colors bg-white border-b cursor-pointer dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-red-600 rounded-full">
+                    {sUser.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{sUser.username}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Click to chat</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* EXISTING CHATS */}
+          {chats.length > 0 && (
+            <h4 className="px-4 py-2 text-xs font-bold text-gray-500 uppercase dark:text-gray-400 bg-gray-50 dark:bg-[#1a1a1a]">Recent Chats</h4>
+          )}
           {chats.map((chat) => (
             <div 
               key={chat.id}
@@ -224,6 +295,12 @@ export default function IOChatApp() {
               <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
             </div>
           ))}
+          {chats.length === 0 && searchResults.length === 0 && (
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+              <p className="text-sm">No chats yet.</p>
+              <p className="text-xs mt-1">Search for a username above to start!</p>
+            </div>
+          )}
         </div>
 
         <div className="p-4 bg-white dark:bg-[#1e1e1e] border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">

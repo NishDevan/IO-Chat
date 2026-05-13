@@ -3,7 +3,7 @@ import { query } from '../database/index.js';
 export const getRecentChats = async (req, res) => {
     try {
         const userId = req.user.id;
-        
+
         // Return latest messages grouped by chat, minimal query
         const sql = `
             SELECT c.id, c.type, c.name, 
@@ -44,7 +44,7 @@ export const createPrivateChat = async (req, res) => {
 
         const client = await (await import('../database/index.js')).getClient();
         await client.query('BEGIN');
-        
+
         const chatRes = await client.query(
             "INSERT INTO chats (type) VALUES ('private') RETURNING id"
         );
