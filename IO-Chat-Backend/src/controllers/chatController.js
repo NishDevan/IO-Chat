@@ -6,12 +6,20 @@ export const getRecentChats = async (req, res) => {
 
         // Return latest messages grouped by chat, minimal query
         const sql = `
-            SELECT c.id, c.type, c.name, 
+            SELECT c.id, c.type, 
+                   COALESCE(c.name, (
+                       SELECT u.username 
+                       FROM chat_members cm2 
+                       JOIN users u ON cm2.user_id = u.id 
+                       WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
+                       LIMIT 1
+                   )) as name,
                    (SELECT content FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                    (SELECT created_at FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time
             FROM chats c
             JOIN chat_members cm ON cm.chat_id = c.id
             WHERE cm.user_id = $1
+            ORDER BY last_message_time DESC NULLS LAST
         `;
         const result = await query(sql, [userId]);
         res.json(result.rows);

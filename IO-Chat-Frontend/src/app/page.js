@@ -330,7 +330,7 @@ export default function IOChatApp() {
               }`}>
                 <p className="text-sm">{msg.content}</p>
                 <span className="block mt-1 text-xs text-right text-gray-400 dark:text-gray-400">
-                  {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  {new Date(new Date(msg.created_at).getTime() - 5 * 60 * 60 * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
               </div>
             </div>
