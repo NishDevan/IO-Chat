@@ -42,6 +42,7 @@ export default function IOChatApp() {
   // Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
 
   // Auth Layout States
   const [isLogin, setIsLogin] = useState(true);
@@ -437,6 +438,18 @@ export default function IOChatApp() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
               </button>
             </div>
+            
+            <div className="relative mb-4">
+              <input 
+                type="text" 
+                placeholder="Search chats..." 
+                value={chatSearchQuery}
+                onChange={(e) => setChatSearchQuery(e.target.value)}
+                className="w-full p-2 pl-8 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
+              />
+              <svg className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+
             <div className="flex gap-2">
                <button onClick={() => setChatFilter('time')} className={`text-xs px-3 py-1.5 rounded-full transition-colors ${chatFilter==='time' ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>Time</button>
                <button onClick={() => setChatFilter('unread')} className={`text-xs px-3 py-1.5 rounded-full transition-colors ${chatFilter==='unread' ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>Unread</button>
@@ -446,34 +459,51 @@ export default function IOChatApp() {
 
           <div className="flex-1 overflow-y-auto">
             {/* EXISTING CHATS */}
-            {chats.length > 0 ? (
-              chats.map((chat) => (
-                <div 
-                  key={chat.id}
-                  onClick={() => setActiveChatId(chat.id)}
-                  className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
-                    activeChatId === chat.id 
-                      ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
-                      : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
-                    {(chat.name || 'P').charAt(0).toUpperCase()}
+            {(() => {
+              const filteredChats = chats.filter(chat => {
+                if (!chatSearchQuery) return true;
+                const searchLower = chatSearchQuery.toLowerCase();
+                const nameLower = (chat.name || '').toLowerCase();
+                const msgLower = (chat.last_message || '').toLowerCase();
+                return nameLower.includes(searchLower) || msgLower.includes(searchLower);
+              });
+              
+              return filteredChats.length > 0 ? (
+                filteredChats.map((chat) => (
+                  <div 
+                    key={chat.id}
+                    onClick={() => setActiveChatId(chat.id)}
+                    className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
+                      activeChatId === chat.id 
+                        ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
+                        : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
+                      {(chat.name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center">
+                        <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                          {chat.name || 'Private Chat'}
+                        </h3>
+                        {chat.last_message_time && (
+                          <span className="text-xs text-gray-400">
+                            {new Date(new Date(chat.last_message_time).getTime() - 5 * 60 * 60 * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                      {chat.name || 'Private Chat'}
-                    </h3>
-                    <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  <p className="text-sm">{chatSearchQuery ? 'No matching chats found.' : 'No chats yet.'}</p>
+                  {!chatSearchQuery && <p className="text-xs mt-1">Tap the + icon to start!</p>}
                 </div>
-              ))
-            ) : (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                <p className="text-sm">No chats yet.</p>
-                <p className="text-xs mt-1">Tap the + icon to start!</p>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
         )}
