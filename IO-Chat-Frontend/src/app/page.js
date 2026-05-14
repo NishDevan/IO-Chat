@@ -220,36 +220,88 @@ export default function IOChatApp() {
 
   const activeChatData = chats.find(chat => chat.id === activeChatId) || { name: "Select a chat" };
 
+  // Right panel derived data
+  const sharedMedia = messages.filter(m => m.type === 'image' && (m.url || m.content)).slice(-9).reverse();
+  const sharedFiles = messages.filter(m => m.file).map(m => ({
+    name: m.file?.name || m.fileName || 'file',
+    ext: (m.file?.name || m.fileName || '').split('.').pop(),
+    size: m.file?.size,
+    url: m.file?.url || '#'
+  }));
+  const sharedLinks = Array.from(new Set(messages.flatMap(m => {
+    if (!m.content) return [];
+    const re = /https?:\/\/[\w\-\.\/~#?&=:%+]+/g;
+    return m.content.match(re) || [];
+  })));
+
   return (
     <div className={`flex h-screen font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
       
-      {/* --- SIDEBAR KIRI --- */}
-      <div className="flex flex-col w-1/3 max-w-sm bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
-        <div className="flex items-center justify-between p-4 bg-white dark:bg-[#1e1e1e] border-b border-gray-200 dark:border-gray-800">
-          <Image 
-            src="/I-O_Logo.png" 
-            alt="Logo I/O Chat" 
-            width={175}
-            height={32}
-            className="object-contain w-auto h-8"
-          />
+      {/* --- FAR LEFT SIDEBAR --- */}
+      <div className="flex flex-col items-center py-6 w-20 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 transition-colors shrink-0">
+        <div className="flex-1 flex flex-col items-center gap-6 w-full">
+          {/* Web Logo */}
+          <div className="flex items-center justify-center w-12 h-12 cursor-pointer transition relative mb-2">
+            <Image 
+              src="/I-O_Logo3.png" 
+              alt="Logo" 
+              fill
+              className="object-contain"
+            />
+          </div>
+
+          {/* Chat / Messages Nav Icon (Active) */}
+          <button className="flex items-center justify-center w-12 h-12 text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400 rounded-xl transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20h1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+          </button>
+          
+          {/* Group Chat Nav Icon */}
+          <button className="flex items-center justify-center w-12 h-12 text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          </button>
+
+          {/* Archive Chat Nav Icon */}
+          <button className="flex items-center justify-center w-12 h-12 text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center gap-4">
+          {/* Settings / Theme Toggle */}
           <button 
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-2 text-gray-600 transition bg-gray-100 rounded-full dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            className="w-12 h-12 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition"
           >
             {isDarkMode ? '☀️' : '🌙'}
           </button>
+
+          {/* Settings Nav Icon (General) */}
+          <button className="w-12 h-12 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.99l1.004.828c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          </button>
+
+          {/* User Avatar */}
+          <div className="flex items-center justify-center w-10 h-10 mt-2 text-sm font-bold text-white bg-red-600 rounded-full shadow-md cursor-pointer hover:bg-red-700 transition">
+            {user.username.charAt(0).toUpperCase()}
+          </div>
         </div>
+      </div>
+
+      {/* --- SIDEBAR KIRI (Chat List) --- */}
+      <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
         
-        {/* --- 3. MAPPING DAFTAR KONTAK --- */}
-        <div className="p-3 border-b border-gray-200 dark:border-gray-800">
-          <input 
-            type="text" 
-            placeholder="Search users to chat..." 
-            value={searchQuery}
-            onChange={(e) => handleSearchUsers(e.target.value)}
-            className="w-full p-2 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500"
-          />
+        <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Messages</h2>
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Search users..." 
+              value={searchQuery}
+              onChange={(e) => handleSearchUsers(e.target.value)}
+              className="w-full p-2 pl-9 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500"
+            />
+            <svg className="w-4 h-4 absolute left-3 top-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -283,16 +335,21 @@ export default function IOChatApp() {
             <div 
               key={chat.id}
               onClick={() => setActiveChatId(chat.id)}
-              className={`p-4 border-b cursor-pointer transition-colors ${
+              className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
                 activeChatId === chat.id 
                   ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
                   : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
               }`}
             >
-              <h3 className={`font-semibold ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                {chat.name || 'Private Chat'}
-              </h3>
-              <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+              <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
+                {(chat.name || 'P').charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                  {chat.name || 'Private Chat'}
+                </h3>
+                <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+              </div>
             </div>
           ))}
           {chats.length === 0 && searchResults.length === 0 && (
@@ -302,19 +359,15 @@ export default function IOChatApp() {
             </div>
           )}
         </div>
-
-        <div className="p-4 bg-white dark:bg-[#1e1e1e] border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
-           <div className="flex items-center justify-center w-10 h-10 font-bold text-white bg-gray-800 rounded-full dark:bg-gray-600">
-              {user.username.charAt(0).toUpperCase()}
-           </div>
-           <button onClick={logout} className="text-sm text-red-500 cursor-pointer">Logout</button>
-        </div>
       </div>
 
       {/* --- AREA CHAT KANAN --- */}
       <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
         
-        <div className="flex items-center p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full">
+            {(activeChatData.name || 'P').charAt(0).toUpperCase()}
+          </div>
           {/* Render nama kontak dinamis */}
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">{activeChatData.name || 'Private Chat'}</h2>
         </div>
@@ -377,6 +430,66 @@ export default function IOChatApp() {
           </button>
         </div>
         )}
+      </div>
+
+      {/* --- RIGHT INFORMATION PANEL --- */}
+      <div className="hidden lg:flex flex-col w-80 max-w-xs bg-white dark:bg-[#080808] border-l border-gray-200 dark:border-gray-800 transition-colors">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Shared Info</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Media, files and links</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 divide-y divide-gray-200 dark:divide-gray-800" style={{minHeight:0}}>
+          {/* Shared media */}
+          <section className="p-4">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared media</h4>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {(sharedMedia.length > 0 ? sharedMedia : Array.from({length:6})).map((m, i) => (
+                <div key={i} className="w-full h-20 bg-gray-100 dark:bg-[#121212] border border-transparent dark:border-gray-800 rounded-md overflow-hidden flex items-center justify-center">
+                  {m?.url || m?.content ? (
+                    // show image if available
+                    <img src={m.url || m.content} alt="shared" className="object-cover w-full h-full" />
+                  ) : (
+                    <div className="text-xs text-gray-400">No media</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Shared files */}
+          <section className="p-4">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared files</h4>
+            <div className="mt-3 space-y-3">
+              {sharedFiles.length > 0 ? sharedFiles.map((f, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <div className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-600 rounded-md text-sm font-semibold">{(f.ext || 'F').slice(0,3)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{f.name}</div>
+                    <div className="text-xs text-gray-400">{f.size ? `${f.size} bytes` : ''}</div>
+                  </div>
+                  <a href={f.url} target="_blank" rel="noreferrer" className="text-xs text-red-600 hover:underline">Open</a>
+                </div>
+              )) : (
+                <div className="text-xs text-gray-400">No files shared</div>
+              )}
+            </div>
+          </section>
+
+          {/* Shared links */}
+          <section className="p-4">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared links</h4>
+            <div className="mt-3 space-y-3">
+              {sharedLinks.length > 0 ? sharedLinks.map((l, idx) => (
+                <a key={idx} href={l} target="_blank" rel="noreferrer" className="block text-sm text-red-600 hover:underline truncate">
+                  {l}
+                </a>
+              )) : (
+                <div className="text-xs text-gray-400">No links shared</div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
 
     </div>
