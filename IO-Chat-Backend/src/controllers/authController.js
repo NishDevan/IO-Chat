@@ -55,7 +55,7 @@ export const login = async (req, res) => {
 
 export const getMe = async (req, res) => {
     try {
-        const result = await query('SELECT id, email, username FROM users WHERE id = $1', [req.user.id]);
+        const result = await query('SELECT id, email, username, status FROM users WHERE id = $1', [req.user.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
         res.json(result.rows[0]);
     } catch (err) {
@@ -67,11 +67,38 @@ export const searchUsers = async (req, res) => {
     const { q } = req.query;
     try {
         const result = await query(
-            'SELECT id, username FROM users WHERE username ILIKE $1 AND id != $2 LIMIT 20',
+            'SELECT id, username, email FROM users WHERE (username ILIKE $1 OR email ILIKE $1) AND id != $2 LIMIT 20',
             [`%${q}%`, req.user.id]
         );
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: 'Server error', details: err.message });
+    }
+};
+
+export const updateProfile = async (req, res) => {
+    const { username, status } = req.body;
+    const userId = req.user.id;
+
+    if (!username) {
+        return res.status(400).json({ error: 'Username is required' });
+    }
+
+    try {
+        const result = await query(
+            'UPDATE users SET username = $1, status = $2 WHERE id = $3 RETURNING id, username, email, status',
+            [username, status, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') { // unique violation
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+        res.status(500).json({ error: 'Server error' });
     }
 };

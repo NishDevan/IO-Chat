@@ -88,3 +88,57 @@ export const createPrivateChat = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+export const createGroupChat = async (req, res) => {
+    try {
+        const { userIds, name } = req.body; // userIds should be an array of IDs
+        const currentUserId = req.user.id;
+
+        if (!name || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(400).json({ error: 'Group name and members are required' });
+        }
+
+        const allUserIds = Array.from(new Set([currentUserId, ...userIds]));
+
+        if (allUserIds.length > 50) {
+            return res.status(400).json({ error: 'Group cannot have more than 50 members' });
+        }
+
+        const client = await (await import('../database/index.js')).getClient();
+        await client.query('BEGIN');
+
+        const chatRes = await client.query(
+            "INSERT INTO chats (type, name) VALUES ('group', $1) RETURNING id",
+            [name]
+        );
+        const chatId = chatRes.rows[0].id;
+
+        const values = allUserIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+        await client.query(
+            `INSERT INTO chat_members (chat_id, user_id) VALUES ${values}`,
+            [chatId, ...allUserIds]
+        );
+
+        await client.query('COMMIT');
+        client.release();
+
+        res.status(201).json({ id: chatId, type: 'group', name });
+    } catch (err) {
+        console.error('createGroupChat error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+export const getChatMembers = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const result = await query(
+            `SELECT u.id, u.username, u.email, u.status 
+             FROM chat_members cm
+             JOIN users u ON u.id = cm.user_id
+             WHERE cm.chat_id = $1`,
+            [chatId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};

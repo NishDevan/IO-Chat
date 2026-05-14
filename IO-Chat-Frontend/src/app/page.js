@@ -51,6 +51,16 @@ export default function IOChatApp() {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Profile Edit States
+  const [editUsername, setEditUsername] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+
+  // Group Create States
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [chatMembers, setChatMembers] = useState([]);
+
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     if (savedToken) {
@@ -65,10 +75,53 @@ export default function IOChatApp() {
         headers: { Authorization: `Bearer ${currentToken}` }
       });
       setUser(res.data);
+      setEditUsername(res.data.username);
+      setEditStatus(res.data.status || "");
     } catch (err) {
       console.error("Auth failed", err);
       logout();
     }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.put(`${BACKEND_URL}/api/auth/profile`, 
+        { username: editUsername, status: editStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUser(res.data);
+      alert("Profile updated successfully!");
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to update profile");
+    }
+  };
+
+  const createGroup = async () => {
+    if (!groupName || selectedUsers.length === 0) {
+      alert("Please provide group name and select at least one member");
+      return;
+    }
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/chats/group`, 
+        { name: groupName, userIds: selectedUsers },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchChats();
+      setActiveChatId(res.data.id);
+      setShowNewChatModal(false);
+      setIsCreatingGroup(false);
+      setGroupName("");
+      setSelectedUsers([]);
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to create group");
+    }
+  };
+
+  const toggleUserSelection = (userId) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
   };
 
   useEffect(() => {
@@ -108,15 +161,6 @@ export default function IOChatApp() {
     }
   };
 
-  useEffect(() => {
-    if (activeChatId && token) {
-      fetchMessages(activeChatId);
-      if (socket) {
-        socket.emit('join_room', activeChatId);
-      }
-    }
-  }, [activeChatId, token]);
-
   const fetchMessages = async (chatId) => {
     try {
       const res = await axios.get(`${BACKEND_URL}/api/chats/${chatId}/messages`, {
@@ -127,6 +171,27 @@ export default function IOChatApp() {
       console.error(err);
     }
   };
+
+  const fetchChatMembers = async (chatId) => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/chats/${chatId}/members`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChatMembers(res.data);
+    } catch (err) {
+      console.error("Error fetching members:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeChatId && token) {
+      fetchMessages(activeChatId);
+      fetchChatMembers(activeChatId);
+      if (socket) {
+        socket.emit('join_room', activeChatId);
+      }
+    }
+  }, [activeChatId, token]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -365,15 +430,42 @@ export default function IOChatApp() {
             {/* Profile Section */}
             <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
               <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Profile</h3>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-red-600 rounded-full shadow-md">
-                   {user.username.charAt(0).toUpperCase()}
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-red-600 rounded-full shadow-md">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{user.username}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{user.email || 'No email provided'}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 italic">"{user.status || "Hey there! I am using I/O Chat."}"</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{user.username}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{user.email || 'No email provided'}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 italic">"Hey there! I am using I/O Chat."</p>
-                </div>
+
+                <form onSubmit={handleUpdateProfile} className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Username</label>
+                    <input 
+                      type="text" 
+                      value={editUsername} 
+                      onChange={(e) => setEditUsername(e.target.value)}
+                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Status</label>
+                    <input 
+                      type="text" 
+                      value={editStatus} 
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-red-500"
+                      placeholder="Enter your status"
+                    />
+                  </div>
+                  <button type="submit" className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition">
+                    Save Changes
+                  </button>
+                </form>
               </div>
             </div>
 
@@ -631,6 +723,31 @@ export default function IOChatApp() {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 divide-y divide-gray-200 dark:divide-gray-800" style={{minHeight:0}}>
+          {/* Group members - Only for group chats */}
+          {activeChatData.type === 'group' && (
+          <section className="">
+            <button onClick={() => toggleSection('members')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase">Group members ({chatMembers.length})</h4>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.members ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {expandedSections.members && (
+              <div className="px-4 pb-4 space-y-3">
+                {chatMembers.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 text-xs font-bold text-white bg-gray-400 rounded-full shrink-0">
+                      {member.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{member.username}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.status || "No status"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+          )}
+
           {/* Shared media */}
           <section className="">
             <button onClick={() => toggleSection('media')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
@@ -710,17 +827,42 @@ export default function IOChatApp() {
             </div>
             
             <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-              <button className="w-full flex items-center justify-center gap-2 py-3 bg-red-50 dark:bg-[#3d1c1c] text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/60 transition font-medium">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                 Create New Group
+              <button 
+                onClick={() => setIsCreatingGroup(!isCreatingGroup)}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl transition font-medium ${isCreatingGroup ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 dark:bg-[#3d1c1c] text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60'}`}
+              >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                  {isCreatingGroup ? "Cancel Group Creation" : "Create New Group"}
               </button>
             </div>
+
+            {isCreatingGroup && (
+              <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
+                <input 
+                  type="text" 
+                  placeholder="Group Name" 
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="w-full p-3 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-500 uppercase">{selectedUsers.length} Selected (Max 50)</span>
+                  <button 
+                    onClick={createGroup}
+                    disabled={selectedUsers.length === 0 || !groupName}
+                    className="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Create Group
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="p-4 border-b border-gray-200 dark:border-gray-800">
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="Search users from database..." 
+                  placeholder="Search username or email (@gmail, etc)..." 
                   value={searchQuery}
                   onChange={(e) => handleSearchUsers(e.target.value)}
                   className="w-full p-3 pl-10 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
@@ -733,20 +875,38 @@ export default function IOChatApp() {
               {searchResults.length > 0 ? searchResults.map(sUser => (
                 <div 
                   key={sUser.id} 
-                  onClick={() => { startChat(sUser.id); setShowNewChatModal(false); }} 
-                  className="flex items-center gap-3 p-3 transition-colors bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer rounded-xl mb-1"
+                  onClick={() => { 
+                    if (isCreatingGroup) {
+                      toggleUserSelection(sUser.id);
+                    } else {
+                      startChat(sUser.id); 
+                      setShowNewChatModal(false); 
+                    }
+                  }} 
+                  className={`flex items-center gap-3 p-3 transition-colors rounded-xl mb-1 cursor-pointer ${
+                    isCreatingGroup && selectedUsers.includes(sUser.id)
+                    ? 'bg-red-50 dark:bg-[#3d1c1c] border border-red-200 dark:border-red-900'
+                    : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
+                  }`}
                 >
-                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full">
+                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full shrink-0">
                     {sUser.username.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{sUser.username}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Click to start chatting</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">{sUser.username}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{sUser.email}</p>
                   </div>
+                  {isCreatingGroup && (
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                      selectedUsers.includes(sUser.id) ? 'bg-red-600 border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                      {selectedUsers.includes(sUser.id) && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>}
+                    </div>
+                  )}
                 </div>
               )) : (
                 <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
-                  {searchQuery ? "No users found in database." : "Type a name to search and chat"}
+                  {searchQuery ? "No users found in database." : "Type a name or email to search"}
                 </div>
               )}
             </div>
