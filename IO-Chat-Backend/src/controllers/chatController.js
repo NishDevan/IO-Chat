@@ -14,7 +14,7 @@ export const getRecentChats = async (req, res) => {
                        WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
                        LIMIT 1
                    )) as name,
-                   (SELECT content FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+                   (SELECT CASE WHEN m.message_type = 'file' THEN '📎 File' ELSE m.content END FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                    (SELECT created_at FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time
             FROM chats c
             JOIN chat_members cm ON cm.chat_id = c.id
@@ -33,7 +33,11 @@ export const getMessages = async (req, res) => {
     try {
         const { chatId } = req.params;
         const result = await query(
-            'SELECT * FROM messages WHERE chat_id = $1 ORDER BY created_at ASC LIMIT 100',
+            `SELECT m.*, a.file_url, a.file_type, a.file_size
+             FROM messages m
+             LEFT JOIN attachments a ON a.message_id = m.id
+             WHERE m.chat_id = $1
+             ORDER BY m.created_at ASC LIMIT 100`,
             [chatId]
         );
         res.json(result.rows);
@@ -46,7 +50,22 @@ export const createPrivateChat = async (req, res) => {
     try {
         const { targetUserId } = req.body;
         const currentUserId = req.user.id;
-    
+
+        // Check if a private chat already exists between these two users
+        const existingChat = await query(
+            `SELECT c.id FROM chats c
+             JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = $1
+             JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = $2
+             WHERE c.type = 'private'
+             LIMIT 1`,
+            [currentUserId, targetUserId]
+        );
+
+        if (existingChat.rows.length > 0) {
+            // Return the existing chat instead of creating a duplicate
+            return res.status(200).json({ id: existingChat.rows[0].id, type: 'private' });
+        }
+
         const client = await (await import('../database/index.js')).getClient();
         await client.query('BEGIN');
 
@@ -65,6 +84,7 @@ export const createPrivateChat = async (req, res) => {
 
         res.status(201).json({ id: chatId, type: 'private' });
     } catch (err) {
+        console.error('createPrivateChat error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 };

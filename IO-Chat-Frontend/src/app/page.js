@@ -18,8 +18,10 @@ export default function IOChatApp() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [socket, setSocket] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -156,6 +158,46 @@ export default function IOChatApp() {
     if(!inputText.trim() || !activeChatId || !socket) return;
     socket.emit('send_message', { chatId: activeChatId, content: inputText });
     setInputText("");
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChatId || !socket) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File size exceeds 2MB limit!');
+      e.target.value = '';
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        socket.emit('send_file', {
+          chatId: activeChatId,
+          fileData: reader.result,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        });
+        setUploadingFile(false);
+      };
+      reader.onerror = () => {
+        alert('Failed to read file');
+        setUploadingFile(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setUploadingFile(false);
+    }
+    e.target.value = '';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   const handleSearchUsers = async (q) => {
@@ -451,7 +493,32 @@ export default function IOChatApp() {
                   ? 'bg-red-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
                   : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
               }`}>
-                <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
+                {msg.message_type === 'file' ? (
+                  msg.file_type?.startsWith('image/') ? (
+                    <div>
+                      <img src={msg.content} alt={msg.file_url || 'image'} className="max-w-xs rounded-lg cursor-pointer" onClick={() => window.open(msg.content, '_blank')} />
+                      <p className="text-xs mt-1 opacity-70">{msg.file_url}</p>
+                    </div>
+                  ) : msg.file_type?.startsWith('video/') ? (
+                    <div>
+                      <video src={msg.content} controls className="max-w-xs rounded-lg" />
+                      <p className="text-xs mt-1 opacity-70">{msg.file_url}</p>
+                    </div>
+                  ) : (
+                    <a href={msg.content} download={msg.file_url || 'file'} className="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer no-underline">
+                      <div className="w-10 h-10 flex items-center justify-center bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">
+                        {(msg.file_url || 'FILE').split('.').pop().toUpperCase().slice(0,4)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{msg.file_url || 'file'}</p>
+                        <p className="text-xs opacity-60">{formatFileSize(msg.file_size)}</p>
+                      </div>
+                      <svg className="w-5 h-5 opacity-50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    </a>
+                  )
+                ) : (
+                  <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
+                )}
                 <span className="block mt-1 text-xs text-right text-gray-400 dark:text-gray-400">
                   {new Date(new Date(msg.created_at).getTime() - 5 * 60 * 60 * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
@@ -463,26 +530,34 @@ export default function IOChatApp() {
 
         {activeChatId && (
         <div className="flex items-center gap-3 p-4 bg-[#f0f0f0] dark:bg-[#1e1e1e] border-t border-gray-300 dark:border-gray-800 transition-colors">
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="*/*" />
           <div className="relative">
             {showAttachMenu && (
               <div className="absolute left-0 z-10 w-40 overflow-hidden bg-white border border-gray-200 shadow-lg bottom-14 dark:bg-[#2a2a2a] dark:border-gray-700 rounded-xl">
                 <button 
                   className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => setShowAttachMenu(false)}
+                  onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = 'image/*'; fileInputRef.current.click(); }}
                 >
                   <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                   Image
                 </button>
                 <button 
                   className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition border-t border-gray-100 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
-                  onClick={() => setShowAttachMenu(false)}
+                  onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = 'video/*'; fileInputRef.current.click(); }}
                 >
                   <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                   Video
                 </button>
+                <button 
+                  className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition border-t border-gray-100 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
+                  onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = '*/*'; fileInputRef.current.click(); }}
+                >
+                  <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  Document
+                </button>
               </div>
             )}
-            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className="p-2 text-gray-500 transition dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className={`p-2 transition ${uploadingFile ? 'text-red-500 animate-pulse' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`} disabled={uploadingFile}>
               <svg className="w-6 h-6 transform -rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
             </button>
           </div>
