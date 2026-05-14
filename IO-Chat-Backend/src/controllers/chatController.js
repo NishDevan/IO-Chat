@@ -4,7 +4,6 @@ export const getRecentChats = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Return latest messages grouped by chat, minimal query
         const sql = `
             SELECT c.id, c.type, 
                    COALESCE(c.name, (
@@ -14,6 +13,11 @@ export const getRecentChats = async (req, res) => {
                        WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
                        LIMIT 1
                    )) as name,
+                   (SELECT u.id 
+                    FROM chat_members cm2 
+                    JOIN users u ON cm2.user_id = u.id 
+                    WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
+                    LIMIT 1) as other_user_id,
                    (SELECT CASE WHEN m.message_type = 'file' THEN '📎 File' ELSE m.content END FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                    (SELECT created_at FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time
             FROM chats c
@@ -51,7 +55,6 @@ export const createPrivateChat = async (req, res) => {
         const { targetUserId } = req.body;
         const currentUserId = req.user.id;
 
-        // Check if a private chat already exists between these two users
         const existingChat = await query(
             `SELECT c.id FROM chats c
              JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = $1
@@ -62,7 +65,6 @@ export const createPrivateChat = async (req, res) => {
         );
 
         if (existingChat.rows.length > 0) {
-            // Return the existing chat instead of creating a duplicate
             return res.status(200).json({ id: existingChat.rows[0].id, type: 'private' });
         }
 
@@ -88,9 +90,10 @@ export const createPrivateChat = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+
 export const createGroupChat = async (req, res) => {
     try {
-        const { userIds, name } = req.body; // userIds should be an array of IDs
+        const { userIds, name } = req.body;
         const currentUserId = req.user.id;
 
         if (!name || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
@@ -127,6 +130,7 @@ export const createGroupChat = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+
 export const getChatMembers = async (req, res) => {
     try {
         const { chatId } = req.params;

@@ -96,9 +96,22 @@ export const updateProfile = async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') { // unique violation
+        if (err.code === '23505') { // unique violationtab messages
             return res.status(409).json({ error: 'Username already exists' });
         }
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+export const getUserProfile = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const result = await query(
+            'SELECT id, username, email, status FROM users WHERE id = $1',
+            [userId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        res.json(result.rows[0]);
+    } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
 };

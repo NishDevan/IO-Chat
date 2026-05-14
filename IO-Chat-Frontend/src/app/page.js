@@ -60,6 +60,7 @@ export default function IOChatApp() {
   const [groupName, setGroupName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [chatMembers, setChatMembers] = useState([]);
+  const [viewingUserProfile, setViewingUserProfile] = useState(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -122,6 +123,17 @@ export default function IOChatApp() {
     setSelectedUsers(prev => 
       prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
     );
+  };
+
+  const handleViewUserProfile = async (userId) => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/auth/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setViewingUserProfile(res.data);
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+    }
   };
 
   useEffect(() => {
@@ -415,7 +427,10 @@ export default function IOChatApp() {
           </button>
 
           {/* User Avatar */}
-          <div className="flex items-center justify-center w-10 h-10 mt-2 text-sm font-bold text-white bg-red-600 rounded-full shadow-md cursor-pointer hover:bg-red-700 transition">
+          <div 
+            onClick={() => handleViewUserProfile(user.id)}
+            className="flex items-center justify-center w-10 h-10 mt-2 text-sm font-bold text-white bg-red-600 rounded-full shadow-md cursor-pointer hover:bg-red-700 transition"
+          >
             {user.username.charAt(0).toUpperCase()}
           </div>
         </div>
@@ -571,7 +586,19 @@ export default function IOChatApp() {
                         : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
                     }`}
                   >
-                    <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (chat.type === 'private' && chat.other_user_id) {
+                          handleViewUserProfile(chat.other_user_id);
+                        } else if (chat.type === 'group') {
+                           // For groups, maybe view group info?
+                           // For now, let's just open the chat
+                           setActiveChatId(chat.id);
+                        }
+                      }}
+                      className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition"
+                    >
                       {(chat.name || 'P').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -604,7 +631,20 @@ export default function IOChatApp() {
       <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
         
         <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" onClick={() => setShowInfoPanel(!showInfoPanel)}>
-          <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full">
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              // If it's a private chat, we can find the other member's ID from the chatMembers state
+              if (activeChatData.type === 'private' && chatMembers.length > 0) {
+                const otherMember = chatMembers.find(m => m.id !== user.id);
+                if (otherMember) handleViewUserProfile(otherMember.id);
+              } else if (activeChatData.type === 'group') {
+                // Clicking group avatar shows panel
+                setShowInfoPanel(!showInfoPanel);
+              }
+            }}
+            className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full hover:opacity-80 transition"
+          >
             {(activeChatData.name || 'P').charAt(0).toUpperCase()}
           </div>
           {/* Render nama kontak dinamis */}
@@ -734,7 +774,10 @@ export default function IOChatApp() {
               <div className="px-4 pb-4 space-y-3">
                 {chatMembers.map((member) => (
                   <div key={member.id} className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 text-xs font-bold text-white bg-gray-400 rounded-full shrink-0">
+                    <div 
+                      onClick={() => handleViewUserProfile(member.id)}
+                      className="flex items-center justify-center w-8 h-8 text-xs font-bold text-white bg-gray-400 rounded-full shrink-0 cursor-pointer hover:bg-gray-500 transition"
+                    >
                       {member.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -889,7 +932,13 @@ export default function IOChatApp() {
                     : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
                   }`}
                 >
-                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full shrink-0">
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewUserProfile(sUser.id);
+                    }}
+                    className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full shrink-0 hover:bg-red-700 transition"
+                  >
                     {sUser.username.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -921,6 +970,47 @@ export default function IOChatApp() {
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
           <img src={lightboxImg} alt="Preview" className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* --- USER PROFILE MODAL --- */}
+      {viewingUserProfile && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingUserProfile(null)}>
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="relative h-32 bg-gradient-to-r from-red-500 to-red-700">
+              <button onClick={() => setViewingUserProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div className="relative px-6 pb-8 text-center -mt-16 z-10">
+              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
+                {viewingUserProfile.username.charAt(0).toUpperCase()}
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingUserProfile.username}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{viewingUserProfile.email}</p>
+              
+              <div className="text-left space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border border-gray-100 dark:border-gray-700">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">About Status</label>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {viewingUserProfile.status || "Hey there! I am using I/O Chat."}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      startChat(viewingUserProfile.id);
+                      setViewingUserProfile(null);
+                    }}
+                    className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
+                  >
+                    Send Message
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
