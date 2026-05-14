@@ -5,13 +5,35 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  --app-accent-50: #fef2f2;
+  --app-accent-100: #fee2e2;
+  --app-accent-200: #fecaca;
+  --app-accent-300: #fca5a5;
+  --app-accent-400: #f87171;
+  --app-accent-500: #ef4444;
+  --app-accent-600: #dc2626;
+  --app-accent-700: #b91c1c;
+  --app-accent-800: #991b1b;
+  --app-accent-900: #7f1d1d;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  --color-accent-50: var(--app-accent-50);
+  --color-accent-100: var(--app-accent-100);
+  --color-accent-200: var(--app-accent-200);
+  --color-accent-300: var(--app-accent-300);
+  --color-accent-400: var(--app-accent-400);
+  --color-accent-500: var(--app-accent-500);
+  --color-accent-600: var(--app-accent-600);
+  --color-accent-700: var(--app-accent-700);
+  --color-accent-800: var(--app-accent-800);
+  --color-accent-900: var(--app-accent-900);
 }
 
 @media (prefers-color-scheme: dark) {
