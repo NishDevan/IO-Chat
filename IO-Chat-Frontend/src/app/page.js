@@ -19,6 +19,11 @@ export default function IOChatApp() {
   const [inputText, setInputText] = useState("");
   const [socket, setSocket] = useState(null);
 
+  // New features state
+  const [currentView, setCurrentView] = useState('chats'); // 'chats', 'groups', 'settings'
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [chatFilter, setChatFilter] = useState('time'); // 'time', 'unread', 'favorites'
+
   // Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -250,13 +255,17 @@ export default function IOChatApp() {
             />
           </div>
 
-          {/* Chat / Messages Nav Icon (Active) */}
-          <button className="flex items-center justify-center w-12 h-12 text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400 rounded-xl transition">
+          {/* Chat / Messages Nav Icon */}
+          <button 
+            onClick={() => setCurrentView('chats')}
+            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'chats' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20h1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
           </button>
           
           {/* Group Chat Nav Icon */}
-          <button className="flex items-center justify-center w-12 h-12 text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+          <button 
+            onClick={() => setCurrentView('groups')}
+            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'groups' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
           </button>
 
@@ -276,7 +285,9 @@ export default function IOChatApp() {
           </button>
 
           {/* Settings Nav Icon (General) */}
-          <button className="w-12 h-12 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+          <button 
+            onClick={() => setCurrentView('settings')}
+            className={`w-12 h-12 flex items-center justify-center rounded-xl transition ${currentView === 'settings' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.99l1.004.828c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
           </button>
 
@@ -287,79 +298,128 @@ export default function IOChatApp() {
         </div>
       </div>
 
-      {/* --- SIDEBAR KIRI (Chat List) --- */}
-      <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
-        
-        <div className="p-5 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Messages</h2>
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="Search users..." 
-              value={searchQuery}
-              onChange={(e) => handleSearchUsers(e.target.value)}
-              className="w-full p-2 pl-9 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500"
-            />
-            <svg className="w-4 h-4 absolute left-3 top-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          </div>
-        </div>
+      {/* --- CONDITIONAL VIEW AREA (Middle & Right) --- */}
+      {currentView === 'settings' ? (
+        <div className="flex-1 flex flex-col bg-[#f0f0f0] dark:bg-[#121212] overflow-y-auto">
+          <div className="max-w-3xl mx-auto w-full p-8 space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Settings</h2>
+            
+            {/* Profile Section */}
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+              <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Profile</h3>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-red-600 rounded-full shadow-md">
+                   {user.username.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{user.username}</h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{user.email || 'No email provided'}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 italic">"Hey there! I am using I/O Chat."</p>
+                </div>
+              </div>
+            </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {/* SEARCH RESULTS */}
-          {searchResults.length > 0 && (
-            <div className="mb-2">
-              <h4 className="px-4 py-2 text-xs font-bold text-gray-500 uppercase dark:text-gray-400 bg-gray-50 dark:bg-[#1a1a1a]">Search Results</h4>
-              {searchResults.map(sUser => (
-                <div 
-                  key={`search-${sUser.id}`}
-                  onClick={() => startChat(sUser.id)}
-                  className="flex items-center gap-3 p-3 transition-colors bg-white border-b cursor-pointer dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-red-600 rounded-full">
-                    {sUser.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{sUser.username}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Click to chat</p>
+            {/* Chat Settings Section */}
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+              <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Chat Settings</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Chat Wallpaper</span>
+                  <button className="text-sm text-red-600 font-medium hover:underline">Change</button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Accent Color</span>
+                  <div className="flex gap-2">
+                    <div className="w-6 h-6 rounded-full bg-red-600 cursor-pointer ring-2 ring-offset-2 ring-red-200 dark:ring-red-900"></div>
+                    <div className="w-6 h-6 rounded-full bg-blue-600 cursor-pointer"></div>
+                    <div className="w-6 h-6 rounded-full bg-green-600 cursor-pointer"></div>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
 
-          {/* EXISTING CHATS */}
-          {chats.length > 0 && (
-            <h4 className="px-4 py-2 text-xs font-bold text-gray-500 uppercase dark:text-gray-400 bg-gray-50 dark:bg-[#1a1a1a]">Recent Chats</h4>
-          )}
-          {chats.map((chat) => (
-            <div 
-              key={chat.id}
-              onClick={() => setActiveChatId(chat.id)}
-              className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
-                activeChatId === chat.id 
-                  ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
-                  : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
-              }`}
-            >
-              <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
-                {(chat.name || 'P').charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                  {chat.name || 'Private Chat'}
-                </h3>
-                <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+            {/* Help & Feedback */}
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+              <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Help & Feedback</h3>
+              <div className="space-y-4">
+                <button className="block w-full text-left text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition">Contact Us</button>
+                <button className="block w-full text-left text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition">Send Feedback</button>
               </div>
             </div>
-          ))}
-          {chats.length === 0 && searchResults.length === 0 && (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              <p className="text-sm">No chats yet.</p>
-              <p className="text-xs mt-1">Search for a username above to start!</p>
+
+            {/* Logout */}
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+               <button onClick={logout} className="w-full py-3 text-red-600 bg-red-50 dark:bg-red-500/10 font-bold rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 transition">Log Out</button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+      <>
+        {currentView === 'groups' ? (
+          <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Groups</h2>
+              <button onClick={() => { setShowNewChatModal(true); handleSearchUsers(""); }} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-full hover:bg-red-100 dark:bg-[#3d1c1c] dark:hover:bg-red-900 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 text-center text-sm text-gray-500">
+              No groups created yet.
+            </div>
+          </div>
+        ) : (
+        <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
+          
+          <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Messages</h2>
+              <button 
+                onClick={() => { setShowNewChatModal(true); handleSearchUsers(""); }}
+                className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-full hover:bg-red-100 dark:bg-[#3d1c1c] dark:hover:bg-red-900 transition"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+              </button>
+            </div>
+            <div className="flex gap-2">
+               <button onClick={() => setChatFilter('time')} className={`text-xs px-3 py-1.5 rounded-full transition-colors ${chatFilter==='time' ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>Time</button>
+               <button onClick={() => setChatFilter('unread')} className={`text-xs px-3 py-1.5 rounded-full transition-colors ${chatFilter==='unread' ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>Unread</button>
+               <button onClick={() => setChatFilter('favorites')} className={`text-xs px-3 py-1.5 rounded-full transition-colors ${chatFilter==='favorites' ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>Favorites</button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* EXISTING CHATS */}
+            {chats.length > 0 ? (
+              chats.map((chat) => (
+                <div 
+                  key={chat.id}
+                  onClick={() => setActiveChatId(chat.id)}
+                  className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
+                    activeChatId === chat.id 
+                      ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
+                      : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
+                    {(chat.name || 'P').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                      {chat.name || 'Private Chat'}
+                    </h3>
+                    <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <p className="text-sm">No chats yet.</p>
+                <p className="text-xs mt-1">Tap the + icon to start!</p>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
       {/* --- AREA CHAT KANAN --- */}
       <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
@@ -491,6 +551,64 @@ export default function IOChatApp() {
           </section>
         </div>
       </div>
+      </>
+      )}
+
+      {/* --- NEW CHAT / CREATE GROUP MODAL --- */}
+      {showNewChatModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-opacity">
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">New Chat</h3>
+              <button onClick={() => setShowNewChatModal(false)} className="p-1 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+              <button className="w-full flex items-center justify-center gap-2 py-3 bg-red-50 dark:bg-[#3d1c1c] text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/60 transition font-medium">
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                 Create New Group
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Search users from database..." 
+                  value={searchQuery}
+                  onChange={(e) => handleSearchUsers(e.target.value)}
+                  className="w-full p-3 pl-10 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
+                />
+                <svg className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {searchResults.length > 0 ? searchResults.map(sUser => (
+                <div 
+                  key={sUser.id} 
+                  onClick={() => { startChat(sUser.id); setShowNewChatModal(false); }} 
+                  className="flex items-center gap-3 p-3 transition-colors bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer rounded-xl mb-1"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full">
+                    {sUser.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">{sUser.username}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Click to start chatting</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+                  {searchQuery ? "No users found in database." : "Type a name to search and chat"}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
