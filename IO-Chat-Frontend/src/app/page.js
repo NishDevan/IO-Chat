@@ -10,6 +10,9 @@ const BACKEND_URL = 'http://localhost:4000';
 export default function IOChatApp() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({});
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
   
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -278,18 +281,20 @@ export default function IOChatApp() {
   const activeChatData = chats.find(chat => chat.id === activeChatId) || { name: "Select a chat" };
 
   // Right panel derived data
-  const sharedMedia = messages.filter(m => m.type === 'image' && (m.url || m.content)).slice(-9).reverse();
-  const sharedFiles = messages.filter(m => m.file).map(m => ({
-    name: m.file?.name || m.fileName || 'file',
-    ext: (m.file?.name || m.fileName || '').split('.').pop(),
-    size: m.file?.size,
-    url: m.file?.url || '#'
+  const sharedMedia = messages.filter(m => m.message_type === 'file' && m.file_type?.startsWith('image/')).slice(-9).reverse();
+  const sharedFiles = messages.filter(m => m.message_type === 'file' && !m.file_type?.startsWith('image/') && !m.file_type?.startsWith('video/')).map(m => ({
+    name: m.file_url || 'file',
+    ext: (m.file_url || '').split('.').pop(),
+    size: m.file_size,
+    url: m.content
   }));
   const sharedLinks = Array.from(new Set(messages.flatMap(m => {
-    if (!m.content) return [];
+    if (!m.content || m.message_type === 'file') return [];
     const re = /https?:\/\/[\w\-\.\/~#?&=:%+]+/g;
     return m.content.match(re) || [];
   })));
+
+  const toggleSection = (key) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div className={`flex h-screen font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
@@ -476,7 +481,7 @@ export default function IOChatApp() {
       {/* --- AREA CHAT KANAN --- */}
       <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
         
-        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" onClick={() => setShowInfoPanel(!showInfoPanel)}>
           <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full">
             {(activeChatData.name || 'P').charAt(0).toUpperCase()}
           </div>
@@ -496,7 +501,7 @@ export default function IOChatApp() {
                 {msg.message_type === 'file' ? (
                   msg.file_type?.startsWith('image/') ? (
                     <div>
-                      <img src={msg.content} alt={msg.file_url || 'image'} className="max-w-xs rounded-lg cursor-pointer" onClick={() => window.open(msg.content, '_blank')} />
+                      <img src={msg.content} alt={msg.file_url || 'image'} className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition" onClick={() => setLightboxImg(msg.content)} />
                       <p className="text-xs mt-1 opacity-70">{msg.file_url}</p>
                     </div>
                   ) : msg.file_type?.startsWith('video/') ? (
@@ -579,64 +584,87 @@ export default function IOChatApp() {
       </div>
 
       {/* --- RIGHT INFORMATION PANEL --- */}
+      {showInfoPanel && (
       <div className="hidden lg:flex flex-col w-80 max-w-xs bg-white dark:bg-[#080808] border-l border-gray-200 dark:border-gray-800 transition-colors">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Shared Info</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Media, files and links</p>
+        {/* User info header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0">
+            {(activeChatData.name || 'P').charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">{activeChatData.name || 'Chat'}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Media, files and links</p>
+          </div>
+          <button onClick={() => setShowInfoPanel(false)} className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 divide-y divide-gray-200 dark:divide-gray-800" style={{minHeight:0}}>
           {/* Shared media */}
-          <section className="p-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared media</h4>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {(sharedMedia.length > 0 ? sharedMedia : Array.from({length:6})).map((m, i) => (
-                <div key={i} className="w-full h-20 bg-gray-100 dark:bg-[#121212] border border-transparent dark:border-gray-800 rounded-md overflow-hidden flex items-center justify-center">
-                  {m?.url || m?.content ? (
-                    // show image if available
-                    <img src={m.url || m.content} alt="shared" className="object-cover w-full h-full" />
-                  ) : (
-                    <div className="text-xs text-gray-400">No media</div>
-                  )}
-                </div>
-              ))}
-            </div>
+          <section className="">
+            <button onClick={() => toggleSection('media')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared media ({sharedMedia.length})</h4>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.media ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {expandedSections.media && (
+              <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+                {sharedMedia.length > 0 ? sharedMedia.map((m, i) => (
+                  <div key={i} className="w-full h-20 bg-gray-100 dark:bg-[#121212] border border-transparent dark:border-gray-800 rounded-md overflow-hidden flex items-center justify-center cursor-pointer hover:opacity-80 transition" onClick={() => setLightboxImg(m.content)}>
+                    <img src={m.content} alt="shared" className="object-cover w-full h-full" />
+                  </div>
+                )) : (
+                  <div className="col-span-3 text-xs text-gray-400 text-center py-2">No media shared</div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Shared files */}
-          <section className="p-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared files</h4>
-            <div className="mt-3 space-y-3">
-              {sharedFiles.length > 0 ? sharedFiles.map((f, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-600 rounded-md text-sm font-semibold">{(f.ext || 'F').slice(0,3)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{f.name}</div>
-                    <div className="text-xs text-gray-400">{f.size ? `${f.size} bytes` : ''}</div>
+          <section className="">
+            <button onClick={() => toggleSection('files')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared files ({sharedFiles.length})</h4>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.files ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {expandedSections.files && (
+              <div className="px-4 pb-4 space-y-3">
+                {sharedFiles.length > 0 ? sharedFiles.map((f, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-md text-sm font-semibold">{(f.ext || 'F').slice(0,3).toUpperCase()}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{f.name}</div>
+                      <div className="text-xs text-gray-400">{formatFileSize(f.size)}</div>
+                    </div>
+                    <a href={f.url} download={f.name} className="text-xs text-red-600 hover:underline">Download</a>
                   </div>
-                  <a href={f.url} target="_blank" rel="noreferrer" className="text-xs text-red-600 hover:underline">Open</a>
-                </div>
-              )) : (
-                <div className="text-xs text-gray-400">No files shared</div>
-              )}
-            </div>
+                )) : (
+                  <div className="text-xs text-gray-400 text-center py-2">No files shared</div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Shared links */}
-          <section className="p-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared links</h4>
-            <div className="mt-3 space-y-3">
-              {sharedLinks.length > 0 ? sharedLinks.map((l, idx) => (
-                <a key={idx} href={l} target="_blank" rel="noreferrer" className="block text-sm text-red-600 hover:underline truncate">
-                  {l}
-                </a>
-              )) : (
-                <div className="text-xs text-gray-400">No links shared</div>
-              )}
-            </div>
+          <section className="">
+            <button onClick={() => toggleSection('links')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase">Shared links ({sharedLinks.length})</h4>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.links ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {expandedSections.links && (
+              <div className="px-4 pb-4 space-y-3">
+                {sharedLinks.length > 0 ? sharedLinks.map((l, idx) => (
+                  <a key={idx} href={l} target="_blank" rel="noreferrer" className="block text-sm text-red-600 hover:underline truncate">
+                    {l}
+                  </a>
+                )) : (
+                  <div className="text-xs text-gray-400 text-center py-2">No links shared</div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>
+      )}
       </>
       )}
 
@@ -693,6 +721,16 @@ export default function IOChatApp() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* --- IMAGE LIGHTBOX MODAL --- */}
+      {lightboxImg && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setLightboxImg(null)}>
+          <button onClick={() => setLightboxImg(null)} className="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-black/40 rounded-full transition z-10">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+          <img src={lightboxImg} alt="Preview" className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl object-contain" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
 
