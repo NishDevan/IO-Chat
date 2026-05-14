@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import axios from 'axios';
 import { io } from 'socket.io-client';
@@ -18,6 +18,16 @@ export default function IOChatApp() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [socket, setSocket] = useState(null);
+
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // New features state
   const [currentView, setCurrentView] = useState('chats'); // 'chats', 'groups', 'settings'
@@ -441,13 +451,14 @@ export default function IOChatApp() {
                   ? 'bg-red-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
                   : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
               }`}>
-                <p className="text-sm">{msg.content}</p>
+                <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
                 <span className="block mt-1 text-xs text-right text-gray-400 dark:text-gray-400">
                   {new Date(new Date(msg.created_at).getTime() - 5 * 60 * 60 * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
               </div>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
 
         {activeChatId && (

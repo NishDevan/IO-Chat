@@ -46,10 +46,7 @@ export const createPrivateChat = async (req, res) => {
     try {
         const { targetUserId } = req.body;
         const currentUserId = req.user.id;
-
-        // Ensure chat doesn't exist already! 
-        // This is simplified. In a real app we check if they already have a private chat.
-
+    
         const client = await (await import('../database/index.js')).getClient();
         await client.query('BEGIN');
 
