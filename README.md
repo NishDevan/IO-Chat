@@ -1,4 +1,4 @@
-B# I/O Chat — Real-time Chat (Frontend + Backend)
+# I/O Chat — Real-time Chat (Frontend + Backend)
 
 Simple real-time chat application (Next.js frontend + Express + PostgreSQL + Redis backend). Repo ini berisi dua bagian utama: IO-Chat-Frontend dan IO-Chat-Backend.
 
