@@ -446,7 +446,7 @@ export default function IOChatApp() {
           {/* Web Logo */}
           <div className="flex items-center justify-center w-12 h-12 cursor-pointer transition relative mb-2">
             <Image 
-              src="/I-O_Logo3.png" 
+              src="/I-O_Logo2.png" 
               alt="Logo" 
               fill
               className="object-contain"
