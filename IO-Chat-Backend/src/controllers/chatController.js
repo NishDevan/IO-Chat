@@ -179,7 +179,6 @@ export const getChatMembers = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
-<<<<<<< HEAD
 
 export const markChatAsRead = async (req, res) => {
     try {
@@ -201,7 +200,10 @@ export const markChatAsRead = async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-=======
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
 export const addGroupMembers = async (req, res) => {
     try {
         const { chatId } = req.params;
@@ -235,7 +237,6 @@ export const addGroupMembers = async (req, res) => {
         res.json({ message: 'Members added successfully' });
     } catch (err) {
         console.error('addGroupMembers error:', err);
->>>>>>> d4c2a03b501d39a2e593aaa44b3633e808c5e9f3
         res.status(500).json({ error: 'Server error' });
     }
 };
