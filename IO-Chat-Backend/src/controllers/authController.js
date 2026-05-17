@@ -105,13 +105,83 @@ export const updateProfile = async (req, res) => {
 export const getUserProfile = async (req, res) => {
     try {
         const { userId } = req.params;
+        const currentUserId = req.user.id;
         const result = await query(
-            'SELECT id, username, email, status FROM users WHERE id = $1',
-            [userId]
+            `SELECT u.id, u.username, u.email, u.status,
+                    EXISTS (
+                        SELECT 1 FROM favorites f 
+                        WHERE f.user_id = $1 AND f.favorite_user_id = u.id
+                    ) as is_favorite
+             FROM users u WHERE u.id = $2`,
+            [currentUserId, userId]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Server error' });
     }
 };
+
+export const toggleFavorite = async (req, res) => {
+    try {
+        const { favoriteUserId, favoriteChatId } = req.body;
+        const userId = req.user.id;
+
+        if (!favoriteUserId && !favoriteChatId) {
+            return res.status(400).json({ error: 'Either favoriteUserId or favoriteChatId is required' });
+        }
+
+        let isFavorite = false;
+
+        if (favoriteUserId) {
+            // Check if favorite already exists
+            const checkFav = await query(
+                'SELECT id FROM favorites WHERE user_id = $1 AND favorite_user_id = $2',
+                [userId, favoriteUserId]
+            );
+
+            if (checkFav.rows.length > 0) {
+                // Remove from favorites
+                await query(
+                    'DELETE FROM favorites WHERE user_id = $1 AND favorite_user_id = $2',
+                    [userId, favoriteUserId]
+                );
+            } else {
+                // Add to favorites
+                await query(
+                    'INSERT INTO favorites (user_id, favorite_user_id) VALUES ($1, $2)',
+                    [userId, favoriteUserId]
+                );
+                isFavorite = true;
+            }
+        } else {
+            // Check if group chat favorite already exists
+            const checkFav = await query(
+                'SELECT id FROM favorites WHERE user_id = $1 AND favorite_chat_id = $2',
+                [userId, favoriteChatId]
+            );
+
+            if (checkFav.rows.length > 0) {
+                // Remove from favorites
+                await query(
+                    'DELETE FROM favorites WHERE user_id = $1 AND favorite_chat_id = $2',
+                    [userId, favoriteChatId]
+                );
+            } else {
+                // Add to favorites
+                await query(
+                    'INSERT INTO favorites (user_id, favorite_chat_id) VALUES ($1, $2)',
+                    [userId, favoriteChatId]
+                );
+                isFavorite = true;
+            }
+        }
+
+        res.json({ isFavorite });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+

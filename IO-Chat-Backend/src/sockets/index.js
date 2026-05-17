@@ -58,6 +58,12 @@ export function initializeSockets(httpServer) {
                 
                 const msg = result.rows[0];
                 
+                // Fetch sender's username
+                const userRes = await query('SELECT username FROM users WHERE id = $1', [socket.userId]);
+                if (userRes.rows.length > 0) {
+                    msg.sender_username = userRes.rows[0].username;
+                }
+                
                 // Broadcast to room
                 io.to(chatId).emit('receive_message', msg);
             } catch (err) {
@@ -89,6 +95,12 @@ export function initializeSockets(httpServer) {
                      VALUES ($1, $2, $3, $4)`,
                     [msg.id, fileName, fileType, fileSize]
                 );
+
+                // Fetch sender's username
+                const userRes = await query('SELECT username FROM users WHERE id = $1', [socket.userId]);
+                if (userRes.rows.length > 0) {
+                    msg.sender_username = userRes.rows[0].username;
+                }
 
                 // Broadcast to room with file metadata
                 io.to(chatId).emit('receive_message', {

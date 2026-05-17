@@ -67,6 +67,42 @@ export default function IOChatApp() {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [chatMembers, setChatMembers] = useState([]);
   const [viewingUserProfile, setViewingUserProfile] = useState(null);
+  const [viewingGroupProfile, setViewingGroupProfile] = useState(null);
+
+  const accentPalettes = {
+    red: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+    blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+    green: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
+    yellow: { 50: '#fefce8', 100: '#fef9c3', 200: '#fef08a', 300: '#fde047', 400: '#facc15', 500: '#eab308', 600: '#ca8a04', 700: '#a16207', 800: '#854d0e', 900: '#713f12' },
+    purple: { 50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe', 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce', 800: '#6b21a8', 900: '#581c87' },
+    pink: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f9a8d4', 400: '#f472b6', 500: '#ec4899', 600: '#db2777', 700: '#be185d', 800: '#9d174d', 900: '#831843' },
+    indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+    teal: { 50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' },
+    orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12' },
+    cyan: { 50: '#ecfeff', 100: '#cffafe', 200: '#a5f3fc', 300: '#67e8f9', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490', 800: '#155e75', 900: '#164e63' },
+  };
+
+  const activePalette = accentPalettes[selectedAccent] || accentPalettes.red;
+  const themeVars = {
+    '--app-accent-50': activePalette[50],
+    '--app-accent-100': activePalette[100],
+    '--app-accent-200': activePalette[200],
+    '--app-accent-300': activePalette[300],
+    '--app-accent-400': activePalette[400],
+    '--app-accent-500': activePalette[500],
+    '--app-accent-600': activePalette[600],
+    '--app-accent-700': activePalette[700],
+    '--app-accent-800': activePalette[800],
+    '--app-accent-900': activePalette[900],
+  };
+
+  const wallpaperTemplates = [
+    { id: 'default', url: '' },
+    { id: 'w1', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1920&auto=format&fit=crop' },
+    { id: 'w2', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1920&auto=format&fit=crop' },
+    { id: 'w3', url: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=1920&auto=format&fit=crop' },
+    { id: 'w4', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=1920&auto=format&fit=crop' }
+  ];
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -159,6 +195,39 @@ export default function IOChatApp() {
     }
   };
 
+  const handleToggleFavorite = async (targetUserId) => {
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
+        { favoriteUserId: targetUserId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setViewingUserProfile(prev => prev && prev.id === targetUserId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
+      fetchChats();
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      alert(err.response?.data?.error || "Failed to toggle favorite");
+    }
+  };
+
+  const handleToggleGroupFavorite = async (targetChatId) => {
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
+        { favoriteChatId: targetChatId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setViewingGroupProfile(prev => prev && prev.id === targetChatId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
+      fetchChats();
+    } catch (err) {
+      console.error("Error toggling group favorite:", err);
+      alert(err.response?.data?.error || "Failed to toggle favorite");
+    }
+  };
+
+  const activeChatIdRef = useRef(null);
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
   useEffect(() => {
     if (user && token) {
       fetchChats();
@@ -168,12 +237,16 @@ export default function IOChatApp() {
       setSocket(newSocket);
 
       newSocket.on('receive_message', (msg) => {
-        setMessages(prev => {
-          // If we received a message for the currently active chat
-          // wait, chat id matches? We need activeChatId inside the effect or use an updater pattern.
-          return [...prev, msg];
-        });
-        fetchChats(); // Refresh chat list order/last msg
+        if (msg.chat_id === activeChatIdRef.current) {
+          setMessages(prev => [...prev, msg]);
+          axios.post(`${BACKEND_URL}/api/chats/${activeChatIdRef.current}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(() => {
+            fetchChats();
+          }).catch(err => console.error(err));
+        } else {
+          fetchChats();
+        }
       });
 
       return () => {
@@ -340,12 +413,15 @@ export default function IOChatApp() {
 
   if (!user) {
     return (
-      <div className={`flex items-center justify-center h-screen bg-gray-100 ${isDarkMode ? 'dark:bg-[#121212]' : ''}`}>
-        <div className="p-8 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-lg w-96">
-          <h2 className="mb-4 text-2xl font-bold dark:text-white text-center">
-            I/O Chat Login
+      <div 
+        className={`flex items-center justify-center h-screen bg-gray-100 transition-colors duration-300 ${isDarkMode ? 'dark:bg-[#121212]' : ''}`}
+        style={themeVars}
+      >
+        <div className="p-8 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-2xl w-96 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
+          <h2 className="mb-6 text-3xl font-extrabold text-gray-800 dark:text-white text-center tracking-tight">
+            I/O Chat <span className="text-accent-600">{isLogin ? "Login" : "Register"}</span>
           </h2>
-          {errorMsg && <p className="mb-4 text-sm text-accent-500">{errorMsg}</p>}
+          {errorMsg && <p className="mb-4 text-sm text-accent-500 font-semibold">{errorMsg}</p>}
           <form onSubmit={handleAuth} className="space-y-4">
             <input 
               type="email" 
@@ -370,11 +446,17 @@ export default function IOChatApp() {
               className="w-full p-2 border rounded text-black dark:bg-[#2a2a2a] dark:text-white dark:border-gray-700"
               required 
             />
-            <button type="submit" className="w-full p-2 text-white bg-accent-600 rounded hover:bg-accent-700">
+            <button 
+              type="submit" 
+              className="w-full p-3 text-white bg-accent-600 hover:bg-accent-700 font-bold rounded-xl shadow-md transition-all active:scale-[0.98]"
+            >
               {isLogin ? "Login" : "Register"}
             </button>
           </form>
-          <p className="mt-4 text-sm text-center text-gray-600 dark:text-gray-400 cursor-pointer" onClick={() => setIsLogin(!isLogin)}>
+          <p 
+            className="mt-6 text-sm text-center text-accent-600 hover:text-accent-700 font-bold cursor-pointer transition-all hover:underline" 
+            onClick={() => setIsLogin(!isLogin)}
+          >
             {isLogin ? "Need an account? Register" : "Already have an account? Login"}
           </p>
         </div>
@@ -400,45 +482,11 @@ export default function IOChatApp() {
 
   const toggleSection = (key) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const accentPalettes = {
-    red: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
-    blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
-    green: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
-    yellow: { 50: '#fefce8', 100: '#fef9c3', 200: '#fef08a', 300: '#fde047', 400: '#facc15', 500: '#eab308', 600: '#ca8a04', 700: '#a16207', 800: '#854d0e', 900: '#713f12' },
-    purple: { 50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe', 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce', 800: '#6b21a8', 900: '#581c87' },
-    pink: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f9a8d4', 400: '#f472b6', 500: '#ec4899', 600: '#db2777', 700: '#be185d', 800: '#9d174d', 900: '#831843' },
-    indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
-    teal: { 50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' },
-    orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12' },
-    cyan: { 50: '#ecfeff', 100: '#cffafe', 200: '#a5f3fc', 300: '#67e8f9', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490', 800: '#155e75', 900: '#164e63' },
-  };
-
-  const activePalette = accentPalettes[selectedAccent] || accentPalettes.red;
-  const themeVars = {
-    '--app-accent-50': activePalette[50],
-    '--app-accent-100': activePalette[100],
-    '--app-accent-200': activePalette[200],
-    '--app-accent-300': activePalette[300],
-    '--app-accent-400': activePalette[400],
-    '--app-accent-500': activePalette[500],
-    '--app-accent-600': activePalette[600],
-    '--app-accent-700': activePalette[700],
-    '--app-accent-800': activePalette[800],
-    '--app-accent-900': activePalette[900],
-  };
-
-  const wallpaperTemplates = [
-    { id: 'default', url: '' },
-    { id: 'w1', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w2', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w3', url: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w4', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=1920&auto=format&fit=crop' }
-  ];
-
-
-
   return (
-    <div className={`flex h-screen font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+    <div 
+      className={`flex h-screen font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}
+      style={themeVars}
+    >
       
       {/* --- FAR LEFT SIDEBAR --- */}
       <div className="flex flex-col items-center py-6 w-20 bg-gray-50 dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 transition-colors shrink-0">
@@ -633,7 +681,7 @@ export default function IOChatApp() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
-                          <h3 className="font-semibold truncate text-gray-800 dark:text-gray-200">{group.name || 'Group Chat'}</h3>
+                          <h3 className="font-bold truncate text-gray-800 dark:text-gray-200">{group.name || 'Group Chat'}</h3>
                           <button
                             className="text-xs px-2 py-1 bg-accent-100 text-accent-600 rounded hover:bg-accent-200 transition"
                             onClick={(e) => { e.stopPropagation(); setGroupToEdit(group); setShowAddMemberModal(true); }}
@@ -685,6 +733,15 @@ export default function IOChatApp() {
             {/* EXISTING CHATS */}
             {(() => {
               const filteredChats = chats.filter(chat => {
+                // First filter by tab selection
+                if (chatFilter === 'unread' && !(chat.unread_count > 0)) {
+                  return false;
+                }
+                if (chatFilter === 'favorites' && !chat.is_favorite) {
+                  return false;
+                }
+
+                // Then filter by search query
                 if (!chatSearchQuery) return true;
                 const searchLower = chatSearchQuery.toLowerCase();
                 const nameLower = (chat.name || '').toLowerCase();
@@ -696,7 +753,11 @@ export default function IOChatApp() {
                 filteredChats.map((chat) => (
                   <div 
                     key={chat.id}
-                    onClick={() => setActiveChatId(chat.id)}
+                    onClick={() => {
+                      setActiveChatId(chat.id);
+                      // Clear unread count locally for instant UI responsiveness
+                      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
+                    }}
                     className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
                       activeChatId === chat.id 
                         ? 'bg-accent-50 dark:bg-[#3d1c1c] border-accent-100 dark:border-accent-900' 
@@ -709,9 +770,8 @@ export default function IOChatApp() {
                         if (chat.type === 'private' && chat.other_user_id) {
                           handleViewUserProfile(chat.other_user_id);
                         } else if (chat.type === 'group') {
-                           // For groups, maybe view group info?
-                           // For now, let's just open the chat
-                           setActiveChatId(chat.id);
+                          setViewingGroupProfile(chat);
+                          fetchChatMembers(chat.id);
                         }
                       }}
                       className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition"
@@ -720,8 +780,13 @@ export default function IOChatApp() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-accent-700 dark:text-accent-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                        <h3 className={`${chat.type === 'group' ? 'font-bold' : 'font-semibold'} truncate flex items-center gap-1.5 ${activeChatId === chat.id ? 'text-accent-700 dark:text-accent-400' : 'text-gray-800 dark:text-gray-200'}`}>
                           {chat.name || 'Private Chat'}
+                          {chat.is_favorite && (
+                            <svg className="w-3.5 h-3.5 text-yellow-500 fill-current shrink-0" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                          )}
                         </h3>
                         {chat.last_message_time && (
                           <span className="text-xs text-gray-400">
@@ -729,7 +794,14 @@ export default function IOChatApp() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+                      <p className="text-sm text-gray-500 truncate dark:text-gray-400 flex items-center justify-between gap-2 mt-0.5">
+                        <span className="truncate">{chat.last_message || 'No messages yet'}</span>
+                        {chat.unread_count > 0 && (
+                          <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-red-600 rounded-full shrink-0 animate-pulse">
+                            {chat.unread_count}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -750,7 +822,17 @@ export default function IOChatApp() {
         style={selectedWallpaper ? { backgroundImage: `url(${selectedWallpaper})` } : {}}
       >
         
-        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" onClick={() => setShowInfoPanel(!showInfoPanel)}>
+        <div 
+          className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" 
+          onClick={() => {
+            if (activeChatData.type === 'group') {
+              setViewingGroupProfile(activeChatData);
+              fetchChatMembers(activeChatData.id);
+            } else {
+              setShowInfoPanel(!showInfoPanel);
+            }
+          }}
+        >
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -759,8 +841,8 @@ export default function IOChatApp() {
                 const otherMember = chatMembers.find(m => m.id !== user.id);
                 if (otherMember) handleViewUserProfile(otherMember.id);
               } else if (activeChatData.type === 'group') {
-                // Clicking group avatar shows panel
-                setShowInfoPanel(!showInfoPanel);
+                setViewingGroupProfile(activeChatData);
+                fetchChatMembers(activeChatData.id);
               }
             }}
             className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full hover:opacity-80 transition"
@@ -775,11 +857,17 @@ export default function IOChatApp() {
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-md p-3 shadow-sm rounded-xl ${
-                msg.sender_id === user.id 
-                  ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
-                  : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
-              }`}>
+              <div className="flex flex-col max-w-md">
+                {activeChatData.type === 'group' && msg.sender_id !== user.id && (
+                  <span className="text-xs font-semibold text-accent-600 dark:text-accent-400 mb-1 px-1">
+                    {msg.sender_username || `User #${msg.sender_id}`}
+                  </span>
+                )}
+                <div className={`p-3 shadow-sm rounded-xl ${
+                  msg.sender_id === user.id 
+                    ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
+                    : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
+                }`}>
                 {msg.message_type === 'file' ? (
                   msg.file_type?.startsWith('image/') ? (
                     <div>
@@ -811,7 +899,8 @@ export default function IOChatApp() {
                 </span>
               </div>
             </div>
-          ))}
+          </div>
+        ))}
           <div ref={messagesEndRef} />
         </div>
 
@@ -1199,6 +1288,84 @@ export default function IOChatApp() {
                     className="flex-1 py-3 bg-accent-600 text-white font-bold rounded-xl hover:bg-accent-700 transition"
                   >
                     Send Message
+                  </button>
+                  {/* Toggle Favorite Button */}
+                  {viewingUserProfile.id !== user.id && (
+                    <button 
+                      onClick={() => handleToggleFavorite(viewingUserProfile.id)}
+                      className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                        viewingUserProfile.is_favorite 
+                          ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
+                          : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                      }`}
+                      title={viewingUserProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      <svg className={`w-5 h-5 ${viewingUserProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                      </svg>
+                      {viewingUserProfile.is_favorite ? "Favorited" : "Favorite"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- GROUP PROFILE MODAL --- */}
+      {viewingGroupProfile && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingGroupProfile(null)}>
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="relative h-32 bg-gradient-to-r from-orange-500 to-red-600">
+              <button onClick={() => setViewingGroupProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div className="relative px-6 pb-8 text-center -mt-16 z-10">
+              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
+                {(viewingGroupProfile.name || 'G').charAt(0).toUpperCase()}
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingGroupProfile.name || 'Group Chat'}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{chatMembers.length} Members</p>
+              
+              <div className="text-left space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border border-gray-100 dark:border-gray-700 max-h-48 overflow-y-auto">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Group Members</label>
+                  <div className="space-y-2">
+                    {chatMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
+                        <span className="font-semibold">{member.username}</span>
+                        <span className="text-xs text-gray-400">{member.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setActiveChatId(viewingGroupProfile.id);
+                      setViewingGroupProfile(null);
+                    }}
+                    className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
+                  >
+                    Open Chat
+                  </button>
+                  {/* Toggle Group Favorite Button */}
+                  <button 
+                    onClick={() => handleToggleGroupFavorite(viewingGroupProfile.id)}
+                    className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                      viewingGroupProfile.is_favorite 
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
+                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                    }`}
+                    title={viewingGroupProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                  >
+                    <svg className={`w-5 h-5 ${viewingGroupProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                    </svg>
+                    {viewingGroupProfile.is_favorite ? "Favorited" : "Favorite"}
                   </button>
                 </div>
               </div>

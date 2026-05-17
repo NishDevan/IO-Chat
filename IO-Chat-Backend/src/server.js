@@ -8,6 +8,9 @@ import { initializeSockets } from './sockets/index.js';
 
 dotenv.config();
 
+import { initDb } from './database/index.js';
+initDb();
+
 const app = express();
 const httpServer = http.createServer(app);
 
