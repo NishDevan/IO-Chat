@@ -69,8 +69,9 @@ export const getMessages = async (req, res) => {
         );
 
         const result = await query(
-            `SELECT m.*, a.file_url, a.file_type, a.file_size
+            `SELECT m.*, u.username as sender_username, a.file_url, a.file_type, a.file_size
              FROM messages m
+             LEFT JOIN users u ON u.id = m.sender_id
              LEFT JOIN attachments a ON a.message_id = m.id
              WHERE m.chat_id = $1
              ORDER BY m.created_at ASC LIMIT 100`,

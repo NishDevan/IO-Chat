@@ -857,11 +857,17 @@ export default function IOChatApp() {
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-md p-3 shadow-sm rounded-xl ${
-                msg.sender_id === user.id 
-                  ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
-                  : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
-              }`}>
+              <div className="flex flex-col max-w-md">
+                {activeChatData.type === 'group' && msg.sender_id !== user.id && (
+                  <span className="text-xs font-semibold text-accent-600 dark:text-accent-400 mb-1 px-1">
+                    {msg.sender_username || `User #${msg.sender_id}`}
+                  </span>
+                )}
+                <div className={`p-3 shadow-sm rounded-xl ${
+                  msg.sender_id === user.id 
+                    ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
+                    : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
+                }`}>
                 {msg.message_type === 'file' ? (
                   msg.file_type?.startsWith('image/') ? (
                     <div>
@@ -893,7 +899,8 @@ export default function IOChatApp() {
                 </span>
               </div>
             </div>
-          ))}
+          </div>
+        ))}
           <div ref={messagesEndRef} />
         </div>
 
