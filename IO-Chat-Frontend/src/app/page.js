@@ -110,7 +110,32 @@ export default function IOChatApp() {
       setToken(savedToken);
       fetchMe(savedToken);
     }
+
+    // Load Dark Mode
+    const savedDarkMode = localStorage.getItem('isDarkMode');
+    if (savedDarkMode !== null) {
+      setIsDarkMode(savedDarkMode === 'true');
+    }
+
+    // Load Wallpaper
+    const savedWallpaper = localStorage.getItem('selectedWallpaper');
+    if (savedWallpaper) {
+      setSelectedWallpaper(savedWallpaper);
+    }
+
+    // Load Accent Color
+    const savedAccent = localStorage.getItem('selectedAccent');
+    if (savedAccent) {
+      setSelectedAccent(savedAccent);
+    }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      setEditUsername(user.username || "");
+      setEditStatus(user.status || "");
+    }
+  }, [user]);
 
   const fetchMe = async (currentToken) => {
     try {
@@ -249,6 +274,13 @@ export default function IOChatApp() {
         }
       });
 
+      newSocket.on('message_deleted', ({ chatId, messageId }) => {
+        if (chatId === activeChatIdRef.current) {
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: 'message was deleted', message_type: 'deleted' } : m));
+        }
+        fetchChats();
+      });
+
       return () => {
         newSocket.disconnect();
       };
@@ -262,10 +294,35 @@ export default function IOChatApp() {
       });
       setChats(res.data);
       if(res.data.length > 0 && !activeChatId) {
-        setActiveChatId(res.data[0].id);
+        const firstUnarchived = res.data.find(c => !c.is_archived);
+        if (firstUnarchived) {
+          setActiveChatId(firstUnarchived.id);
+        } else {
+          setActiveChatId(res.data[0].id);
+        }
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleToggleArchive = async (chatId, targetUserId, archive) => {
+    try {
+      const res = await axios.put(`${BACKEND_URL}/api/chats/archive`, {
+        chatId,
+        targetUserId,
+        archive
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        await fetchChats();
+        if (archive && chatId === activeChatId) {
+          setActiveChatId(null);
+        }
+      }
+    } catch (err) {
+      console.error("Error toggling archive status:", err);
     }
   };
 
@@ -304,10 +361,26 @@ export default function IOChatApp() {
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('isDarkMode', 'true');
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('isDarkMode', 'false');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (selectedWallpaper) {
+      localStorage.setItem('selectedWallpaper', selectedWallpaper);
+    } else {
+      localStorage.removeItem('selectedWallpaper');
+    }
+  }, [selectedWallpaper]);
+
+  useEffect(() => {
+    if (selectedAccent) {
+      localStorage.setItem('selectedAccent', selectedAccent);
+    }
+  }, [selectedAccent]);
 
   // Handle Dynamic Accent Color
   // Implementation removed per user request to fix initialization error
@@ -338,6 +411,13 @@ export default function IOChatApp() {
     if(!inputText.trim() || !activeChatId || !socket) return;
     socket.emit('send_message', { chatId: activeChatId, content: inputText });
     setInputText("");
+  };
+
+  const handleDeleteMessage = (messageId) => {
+    if (!socket || !activeChatId) return;
+    if (confirm("Are you sure you want to delete this message?")) {
+      socket.emit('delete_message', { chatId: activeChatId, messageId });
+    }
   };
 
   const handleFileSelect = async (e) => {
@@ -417,48 +497,55 @@ export default function IOChatApp() {
         className={`flex items-center justify-center h-screen bg-gray-100 transition-colors duration-300 ${isDarkMode ? 'dark:bg-[#121212]' : ''}`}
         style={themeVars}
       >
-        <div className="p-8 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-2xl w-96 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
-          <h2 className="mb-6 text-3xl font-extrabold text-gray-800 dark:text-white text-center tracking-tight">
-            I/O Chat <span className="text-accent-600">{isLogin ? "Login" : "Register"}</span>
-          </h2>
-          {errorMsg && <p className="mb-4 text-sm text-accent-500 font-semibold">{errorMsg}</p>}
-          <form onSubmit={handleAuth} className="space-y-4">
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full p-2 border rounded text-black dark:bg-[#2a2a2a] dark:text-white dark:border-gray-700"
-              required 
-            />
-            {!isLogin && (
+        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl w-96 border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="h-32 bg-red-600 flex flex-col items-center justify-center p-6 text-white text-center relative">
+            <h2 className="text-3xl font-black tracking-tight drop-shadow-md">
+              I/O Chat
+            </h2>
+            <p className="text-sm font-medium text-white/95 mt-1">
+              {isLogin ? "Welcome back!" : "Create an account"}
+            </p>
+          </div>
+          <div className="p-8">
+            {errorMsg && <p className="mb-4 text-sm text-red-500 font-semibold">{errorMsg}</p>}
+            <form onSubmit={handleAuth} className="space-y-4">
               <input 
-                type="text" 
-                placeholder="Username" 
-                value={username} onChange={e => setUsername(e.target.value)}
-                className="w-full p-2 border rounded text-black dark:bg-[#2a2a2a] dark:text-white dark:border-gray-700"
+                type="email" 
+                placeholder="Email" 
+                value={email} onChange={e => setEmail(e.target.value)}
+                className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-black dark:bg-[#2a2a2a] dark:text-white focus:outline-none focus:border-red-500"
                 required 
               />
-            )}
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full p-2 border rounded text-black dark:bg-[#2a2a2a] dark:text-white dark:border-gray-700"
-              required 
-            />
-            <button 
-              type="submit" 
-              className="w-full p-3 text-white bg-accent-600 hover:bg-accent-700 font-bold rounded-xl shadow-md transition-all active:scale-[0.98]"
+              {!isLogin && (
+                <input 
+                  type="text" 
+                  placeholder="Username" 
+                  value={username} onChange={e => setUsername(e.target.value)}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-black dark:bg-[#2a2a2a] dark:text-white focus:outline-none focus:border-red-500"
+                  required 
+                />
+              )}
+              <input 
+                type="password" 
+                placeholder="Password" 
+                value={password} onChange={e => setPassword(e.target.value)}
+                className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-black dark:bg-[#2a2a2a] dark:text-white focus:outline-none focus:border-red-500"
+                required 
+              />
+              <button 
+                type="submit" 
+                className="w-full py-3.5 text-white bg-red-600 hover:bg-red-700 font-extrabold rounded-xl shadow-md transition-all active:scale-[0.98]"
+              >
+                {isLogin ? "Login" : "Register"}
+              </button>
+            </form>
+            <p 
+              className="mt-6 text-sm text-center text-red-600 hover:text-red-700 font-bold cursor-pointer transition-all hover:underline" 
+              onClick={() => setIsLogin(!isLogin)}
             >
-              {isLogin ? "Login" : "Register"}
-            </button>
-          </form>
-          <p 
-            className="mt-6 text-sm text-center text-accent-600 hover:text-accent-700 font-bold cursor-pointer transition-all hover:underline" 
-            onClick={() => setIsLogin(!isLogin)}
-          >
-            {isLogin ? "Need an account? Register" : "Already have an account? Login"}
-          </p>
+              {isLogin ? "Need an account? Register" : "Already have an account? Login"}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -516,7 +603,9 @@ export default function IOChatApp() {
           </button>
 
           {/* Archive Chat Nav Icon */}
-          <button className="flex items-center justify-center w-12 h-12 text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 rounded-xl transition">
+          <button 
+            onClick={() => setCurrentView('archive')}
+            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'archive' ? 'text-accent-600 bg-accent-100 dark:bg-[#3d1c1c] dark:text-accent-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
           </button>
         </div>
@@ -558,13 +647,15 @@ export default function IOChatApp() {
               <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Profile</h3>
               <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-accent-600 rounded-full shadow-md">
+                  <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-accent-600 rounded-full shadow-md shrink-0">
                     {user.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h4 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{user.username}</h4>
+                    <h4 className="text-xl font-bold text-gray-800 dark:text-white leading-tight">{user.username}</h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{user.email || 'No email provided'}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 italic">"{user.status || "Hey there! I am using I/O Chat."}"</p>
+                    <div className="px-3 py-1.5 bg-gray-50 dark:bg-[#2a2a2a] rounded-lg border border-gray-100 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 italic">
+                      "{user.status || "Hey there! I am using I/O Chat."}"
+                    </div>
                   </div>
                 </div>
 
@@ -575,7 +666,7 @@ export default function IOChatApp() {
                       type="text" 
                       value={editUsername} 
                       onChange={(e) => setEditUsername(e.target.value)}
-                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
+                      className="w-full p-3 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-xl text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
                     />
                   </div>
                   <div>
@@ -584,11 +675,11 @@ export default function IOChatApp() {
                       type="text" 
                       value={editStatus} 
                       onChange={(e) => setEditStatus(e.target.value)}
-                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
+                      className="w-full p-3 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-xl text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
                       placeholder="Enter your status"
                     />
                   </div>
-                  <button type="submit" className="px-4 py-2 bg-accent-600 text-white font-bold rounded-lg hover:bg-accent-700 transition">
+                  <button type="submit" className="px-6 py-2.5 bg-accent-600 hover:bg-accent-700 text-white font-bold rounded-xl transition shadow-sm hover:shadow-md duration-200">
                     Save Changes
                   </button>
                 </form>
@@ -652,7 +743,12 @@ export default function IOChatApp() {
 
             {/* Logout */}
             <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-               <button onClick={logout} className="w-full py-3 text-accent-600 bg-accent-50 dark:bg-accent-500/10 font-bold rounded-lg hover:bg-accent-100 dark:hover:bg-accent-500/20 transition">Log Out</button>
+               <button 
+                 onClick={logout} 
+                 className="w-full py-3.5 bg-accent-600 hover:bg-accent-700 text-white font-extrabold rounded-xl shadow-md transition-all active:scale-[0.99] duration-200"
+               >
+                 Log Out
+               </button>
             </div>
           </div>
         </div>
@@ -668,7 +764,7 @@ export default function IOChatApp() {
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {(() => {
-                const groupChats = chats.filter(chat => chat.type === 'group');
+                const groupChats = chats.filter(chat => chat.type === 'group' && !chat.is_archived);
                 return groupChats.length > 0 ? (
                   groupChats.map(group => (
                     <div
@@ -693,6 +789,85 @@ export default function IOChatApp() {
                   ))
                 ) : (
                   <div className="p-4 text-center text-gray-500 dark:text-gray-400">No groups found.</div>
+                );
+              })()}
+            </div>
+          </div>
+        ) : currentView === 'archive' ? (
+          <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Archived Chats</h2>
+            </div>
+            
+            <div className="relative p-4 pb-2">
+              <input 
+                type="text" 
+                placeholder="Search archived..." 
+                value={chatSearchQuery}
+                onChange={(e) => setChatSearchQuery(e.target.value)}
+                className="w-full p-2 pl-8 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-accent-500 dark:focus:border-accent-500 font-medium"
+              />
+              <svg className="w-4 h-4 absolute left-6.5 top-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {(() => {
+                const archivedChats = chats.filter(chat => {
+                  if (!chat.is_archived) return false;
+                  if (!chatSearchQuery) return true;
+                  const searchLower = chatSearchQuery.toLowerCase();
+                  const nameLower = (chat.name || '').toLowerCase();
+                  const msgLower = (chat.last_message || '').toLowerCase();
+                  return nameLower.includes(searchLower) || msgLower.includes(searchLower);
+                });
+                
+                return archivedChats.length > 0 ? (
+                  archivedChats.map((chat) => (
+                    <div 
+                      key={chat.id}
+                      onClick={() => {
+                        setActiveChatId(chat.id);
+                        setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
+                      }}
+                      className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
+                        activeChatId === chat.id 
+                          ? 'bg-accent-50 dark:bg-[#3d1c1c] border-accent-100 dark:border-accent-900' 
+                          : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
+                      }`}
+                    >
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (chat.type === 'private' && chat.other_user_id) {
+                            handleViewUserProfile(chat.other_user_id);
+                          } else if (chat.type === 'group') {
+                            setViewingGroupProfile(chat);
+                            fetchChatMembers(chat.id);
+                          }
+                        }}
+                        className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition"
+                      >
+                        {(chat.name || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center">
+                          <h3 className={`${chat.type === 'group' ? 'font-bold' : 'font-semibold'} truncate flex items-center gap-1.5 ${activeChatId === chat.id ? 'text-accent-700 dark:text-accent-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                            {chat.name || 'Private Chat'}
+                          </h3>
+                          {chat.last_message_time && (
+                            <span className="text-xs text-gray-400">
+                              {new Date(new Date(chat.last_message_time).getTime() - 5 * 60 * 60 * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 truncate dark:text-gray-400 mt-0.5">
+                          {chat.last_message || 'No messages yet'}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">No archived chats.</div>
                 );
               })()}
             </div>
@@ -733,6 +908,8 @@ export default function IOChatApp() {
             {/* EXISTING CHATS */}
             {(() => {
               const filteredChats = chats.filter(chat => {
+                if (chat.is_archived) return false;
+
                 // First filter by tab selection
                 if (chatFilter === 'unread' && !(chat.unread_count > 0)) {
                   return false;
@@ -825,12 +1002,7 @@ export default function IOChatApp() {
         <div 
           className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" 
           onClick={() => {
-            if (activeChatData.type === 'group') {
-              setViewingGroupProfile(activeChatData);
-              fetchChatMembers(activeChatData.id);
-            } else {
-              setShowInfoPanel(!showInfoPanel);
-            }
+            setShowInfoPanel(!showInfoPanel);
           }}
         >
           <div 
@@ -856,7 +1028,18 @@ export default function IOChatApp() {
         {/* --- 4. MAPPING ISI PESAN --- */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} group relative mb-2`}>
+              {msg.sender_id === user.id && msg.message_type !== 'deleted' && (
+                <button
+                  onClick={() => handleDeleteMessage(msg.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 self-center mr-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
+                  title="Delete message"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
               <div className="flex flex-col max-w-md">
                 {activeChatData.type === 'group' && msg.sender_id !== user.id && (
                   <span className="text-xs font-semibold text-accent-600 dark:text-accent-400 mb-1 px-1">
@@ -868,7 +1051,14 @@ export default function IOChatApp() {
                     ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
                     : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
                 }`}>
-                {msg.message_type === 'file' ? (
+                {msg.message_type === 'deleted' ? (
+                  <p className="text-sm italic text-gray-400 dark:text-gray-500 flex items-center gap-1.5 font-medium">
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    message was deleted
+                  </p>
+                ) : msg.message_type === 'file' ? (
                   msg.file_type?.startsWith('image/') ? (
                     <div>
                       <img src={msg.content} alt={msg.file_url || 'image'} className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition" onClick={() => setLightboxImg(msg.content)} />
@@ -1285,15 +1475,31 @@ export default function IOChatApp() {
                       startChat(viewingUserProfile.id);
                       setViewingUserProfile(null);
                     }}
-                    className="flex-1 py-3 bg-accent-600 text-white font-bold rounded-xl hover:bg-accent-700 transition"
+                    className="flex-1 py-3 bg-accent-600 hover:bg-accent-700 text-white font-bold rounded-xl transition text-sm shrink-0"
                   >
                     Send Message
                   </button>
+                  {(() => {
+                    const userChat = chats.find(c => c.type === 'private' && c.other_user_id === viewingUserProfile.id);
+                    const isArchived = userChat ? userChat.is_archived : false;
+                    return (
+                      <button 
+                        onClick={() => handleToggleArchive(userChat?.id, viewingUserProfile.id, !isArchived)}
+                        className={`flex-1 py-3 font-bold rounded-xl border transition text-sm shrink-0 ${
+                          isArchived 
+                            ? 'bg-accent-50 border-accent-200 text-accent-600 dark:bg-[#3d1c1c]/20 dark:border-accent-900/50 dark:text-accent-400 hover:bg-accent-100'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                        }`}
+                      >
+                        {isArchived ? "Unarchive" : "Archive"}
+                      </button>
+                    );
+                  })()}
                   {/* Toggle Favorite Button */}
                   {viewingUserProfile.id !== user.id && (
                     <button 
                       onClick={() => handleToggleFavorite(viewingUserProfile.id)}
-                      className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                      className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center shrink-0 ${
                         viewingUserProfile.is_favorite 
                           ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
                           : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
@@ -1303,7 +1509,6 @@ export default function IOChatApp() {
                       <svg className={`w-5 h-5 ${viewingUserProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
                       </svg>
-                      {viewingUserProfile.is_favorite ? "Favorited" : "Favorite"}
                     </button>
                   )}
                 </div>
@@ -1317,13 +1522,13 @@ export default function IOChatApp() {
       {viewingGroupProfile && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingGroupProfile(null)}>
           <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="relative h-32 bg-gradient-to-r from-orange-500 to-red-600">
+            <div className="relative h-32 bg-gradient-to-r from-accent-500 to-accent-700">
               <button onClick={() => setViewingGroupProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
             <div className="relative px-6 pb-8 text-center -mt-16 z-10">
-              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
+              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-accent-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
                 {(viewingGroupProfile.name || 'G').charAt(0).toUpperCase()}
               </div>
               <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingGroupProfile.name || 'Group Chat'}</h3>
@@ -1348,14 +1553,30 @@ export default function IOChatApp() {
                       setActiveChatId(viewingGroupProfile.id);
                       setViewingGroupProfile(null);
                     }}
-                    className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
+                    className="flex-1 py-3 bg-accent-600 hover:bg-accent-700 text-white font-bold rounded-xl transition text-sm shrink-0"
                   >
                     Open Chat
                   </button>
+                  {(() => {
+                    const groupChat = chats.find(c => c.id === viewingGroupProfile.id);
+                    const isArchived = groupChat ? groupChat.is_archived : false;
+                    return (
+                      <button 
+                        onClick={() => handleToggleArchive(viewingGroupProfile.id, null, !isArchived)}
+                        className={`flex-1 py-3 font-bold rounded-xl border transition text-sm shrink-0 ${
+                          isArchived 
+                            ? 'bg-accent-50 border-accent-200 text-accent-600 dark:bg-[#3d1c1c]/20 dark:border-accent-900/50 dark:text-accent-400 hover:bg-accent-100'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                        }`}
+                      >
+                        {isArchived ? "Unarchive" : "Archive"}
+                      </button>
+                    );
+                  })()}
                   {/* Toggle Group Favorite Button */}
                   <button 
                     onClick={() => handleToggleGroupFavorite(viewingGroupProfile.id)}
-                    className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                    className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center shrink-0 ${
                       viewingGroupProfile.is_favorite 
                         ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
                         : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
@@ -1365,7 +1586,6 @@ export default function IOChatApp() {
                     <svg className={`w-5 h-5 ${viewingGroupProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
                     </svg>
-                    {viewingGroupProfile.is_favorite ? "Favorited" : "Favorite"}
                   </button>
                 </div>
               </div>

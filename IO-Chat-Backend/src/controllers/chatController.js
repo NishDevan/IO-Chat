@@ -5,7 +5,7 @@ export const getRecentChats = async (req, res) => {
         const userId = req.user.id;
 
         const sql = `
-            SELECT c.id, c.type, 
+            SELECT c.id, c.type, cm.is_archived,
                    COALESCE(c.name, (
                        SELECT u.username 
                        FROM chat_members cm2 
@@ -238,6 +238,63 @@ export const addGroupMembers = async (req, res) => {
         res.json({ message: 'Members added successfully' });
     } catch (err) {
         console.error('addGroupMembers error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const toggleArchiveChat = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { chatId, targetUserId, archive } = req.body;
+
+        let targetChatId = chatId;
+
+        if (!targetChatId && targetUserId) {
+            const chatRes = await query(
+                `SELECT c.id FROM chats c
+                 JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = $1
+                 JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = $2
+                 WHERE c.type = 'private'
+                 LIMIT 1`,
+                [userId, targetUserId]
+            );
+            if (chatRes.rows.length > 0) {
+                targetChatId = chatRes.rows[0].id;
+            } else {
+                const client = await (await import('../database/index.js')).getClient();
+                await client.query('BEGIN');
+
+                const newChatRes = await client.query(
+                    "INSERT INTO chats (type) VALUES ('private') RETURNING id"
+                );
+                targetChatId = newChatRes.rows[0].id;
+
+                await client.query(
+                    "INSERT INTO chat_members (chat_id, user_id, is_archived) VALUES ($1, $2, $3), ($1, $4, FALSE)",
+                    [targetChatId, userId, archive === true, targetUserId]
+                );
+
+                await client.query('COMMIT');
+                client.release();
+                
+                return res.json({ success: true, chatId: targetChatId, isArchived: archive === true });
+            }
+        }
+
+        if (!targetChatId) {
+            return res.status(400).json({ error: 'Chat ID or Target User ID is required' });
+        }
+
+        await query(
+            `UPDATE chat_members 
+             SET is_archived = $1 
+             WHERE chat_id = $2 AND user_id = $3`,
+            [archive === true, targetChatId, userId]
+        );
+
+        res.json({ success: true, chatId: targetChatId, isArchived: archive === true });
+    } catch (err) {
+        console.error('toggleArchiveChat error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 };
