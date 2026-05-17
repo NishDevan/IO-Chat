@@ -110,6 +110,24 @@ export default function IOChatApp() {
       setToken(savedToken);
       fetchMe(savedToken);
     }
+
+    // Load Dark Mode
+    const savedDarkMode = localStorage.getItem('isDarkMode');
+    if (savedDarkMode !== null) {
+      setIsDarkMode(savedDarkMode === 'true');
+    }
+
+    // Load Wallpaper
+    const savedWallpaper = localStorage.getItem('selectedWallpaper');
+    if (savedWallpaper) {
+      setSelectedWallpaper(savedWallpaper);
+    }
+
+    // Load Accent Color
+    const savedAccent = localStorage.getItem('selectedAccent');
+    if (savedAccent) {
+      setSelectedAccent(savedAccent);
+    }
   }, []);
 
   useEffect(() => {
@@ -343,10 +361,26 @@ export default function IOChatApp() {
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('isDarkMode', 'true');
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('isDarkMode', 'false');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (selectedWallpaper) {
+      localStorage.setItem('selectedWallpaper', selectedWallpaper);
+    } else {
+      localStorage.removeItem('selectedWallpaper');
+    }
+  }, [selectedWallpaper]);
+
+  useEffect(() => {
+    if (selectedAccent) {
+      localStorage.setItem('selectedAccent', selectedAccent);
+    }
+  }, [selectedAccent]);
 
   // Handle Dynamic Accent Color
   // Implementation removed per user request to fix initialization error
@@ -464,7 +498,7 @@ export default function IOChatApp() {
         style={themeVars}
       >
         <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-2xl w-96 border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
-          <div className="h-32 bg-gradient-to-r from-orange-500 to-red-600 flex flex-col items-center justify-center p-6 text-white text-center relative">
+          <div className="h-32 bg-red-600 flex flex-col items-center justify-center p-6 text-white text-center relative">
             <h2 className="text-3xl font-black tracking-tight drop-shadow-md">
               I/O Chat
             </h2>
@@ -500,7 +534,7 @@ export default function IOChatApp() {
               />
               <button 
                 type="submit" 
-                className="w-full py-3.5 text-white bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 font-extrabold rounded-xl shadow-md transition-all active:scale-[0.98]"
+                className="w-full py-3.5 text-white bg-red-600 hover:bg-red-700 font-extrabold rounded-xl shadow-md transition-all active:scale-[0.98]"
               >
                 {isLogin ? "Login" : "Register"}
               </button>
@@ -968,12 +1002,7 @@ export default function IOChatApp() {
         <div 
           className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" 
           onClick={() => {
-            if (activeChatData.type === 'group') {
-              setViewingGroupProfile(activeChatData);
-              fetchChatMembers(activeChatData.id);
-            } else {
-              setShowInfoPanel(!showInfoPanel);
-            }
+            setShowInfoPanel(!showInfoPanel);
           }}
         >
           <div 
