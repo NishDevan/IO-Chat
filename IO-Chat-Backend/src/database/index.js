@@ -30,6 +30,11 @@ export const initDb = async () => {
       ALTER TABLE favorites ADD COLUMN IF NOT EXISTS favorite_chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE;
     `);
 
+    // Dynamically add is_archived column to chat_members
+    await query(`
+      ALTER TABLE chat_members ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+    `);
+
     // Add constraints in try/catch to avoid crash if they already exist
     try {
       await query(`
@@ -46,7 +51,7 @@ export const initDb = async () => {
       `);
     } catch (e) {}
 
-    console.log("Database initialized: favorites table ensured.");
+    console.log("Database initialized: favorites and chat_members tables ensured.");
   } catch (err) {
     console.error("Failed to initialize database:", err);
   }
