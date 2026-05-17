@@ -5,7 +5,7 @@ import Image from 'next/image';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-const BACKEND_URL = 'http://localhost:4000';
+const BACKEND_URL = 'https://io-chat-ug06.onrender.com';
 
 export default function IOChatApp() {
   const [isDarkMode, setIsDarkMode] = useState(false);
