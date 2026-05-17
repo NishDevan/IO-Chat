@@ -72,6 +72,34 @@ export function initializeSockets(httpServer) {
             }
         });
 
+        socket.on('delete_message', async ({ chatId, messageId }) => {
+            try {
+                const msgRes = await query('SELECT sender_id FROM messages WHERE id = $1', [messageId]);
+                if (msgRes.rows.length === 0) {
+                    socket.emit('error', { message: 'Message not found' });
+                    return;
+                }
+                if (msgRes.rows[0].sender_id !== socket.userId) {
+                    socket.emit('error', { message: 'Unauthorized to delete this message' });
+                    return;
+                }
+
+                await query(
+                    `UPDATE messages 
+                     SET content = 'message was deleted', message_type = 'deleted' 
+                     WHERE id = $1`,
+                    [messageId]
+                );
+
+                await query('DELETE FROM attachments WHERE message_id = $1', [messageId]);
+
+                io.to(chatId).emit('message_deleted', { chatId, messageId });
+            } catch (err) {
+                console.error('Delete message error:', err);
+                socket.emit('error', { message: 'Failed to delete message' });
+            }
+        });
+
         // File sharing handler
         socket.on('send_file', async ({ chatId, fileData, fileName, fileType, fileSize }) => {
             try {

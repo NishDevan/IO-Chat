@@ -249,6 +249,13 @@ export default function IOChatApp() {
         }
       });
 
+      newSocket.on('message_deleted', ({ chatId, messageId }) => {
+        if (chatId === activeChatIdRef.current) {
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: 'message was deleted', message_type: 'deleted' } : m));
+        }
+        fetchChats();
+      });
+
       return () => {
         newSocket.disconnect();
       };
@@ -338,6 +345,13 @@ export default function IOChatApp() {
     if(!inputText.trim() || !activeChatId || !socket) return;
     socket.emit('send_message', { chatId: activeChatId, content: inputText });
     setInputText("");
+  };
+
+  const handleDeleteMessage = (messageId) => {
+    if (!socket || !activeChatId) return;
+    if (confirm("Are you sure you want to delete this message?")) {
+      socket.emit('delete_message', { chatId: activeChatId, messageId });
+    }
   };
 
   const handleFileSelect = async (e) => {
@@ -856,7 +870,18 @@ export default function IOChatApp() {
         {/* --- 4. MAPPING ISI PESAN --- */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} group relative mb-2`}>
+              {msg.sender_id === user.id && msg.message_type !== 'deleted' && (
+                <button
+                  onClick={() => handleDeleteMessage(msg.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 self-center mr-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
+                  title="Delete message"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
               <div className="flex flex-col max-w-md">
                 {activeChatData.type === 'group' && msg.sender_id !== user.id && (
                   <span className="text-xs font-semibold text-accent-600 dark:text-accent-400 mb-1 px-1">
@@ -868,7 +893,14 @@ export default function IOChatApp() {
                     ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
                     : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
                 }`}>
-                {msg.message_type === 'file' ? (
+                {msg.message_type === 'deleted' ? (
+                  <p className="text-sm italic text-gray-400 dark:text-gray-500 flex items-center gap-1.5 font-medium">
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    message was deleted
+                  </p>
+                ) : msg.message_type === 'file' ? (
                   msg.file_type?.startsWith('image/') ? (
                     <div>
                       <img src={msg.content} alt={msg.file_url || 'image'} className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition" onClick={() => setLightboxImg(msg.content)} />
