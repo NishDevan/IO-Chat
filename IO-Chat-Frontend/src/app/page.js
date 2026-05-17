@@ -61,6 +61,7 @@ export default function IOChatApp() {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [chatMembers, setChatMembers] = useState([]);
   const [viewingUserProfile, setViewingUserProfile] = useState(null);
+  const [viewingGroupProfile, setViewingGroupProfile] = useState(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -136,6 +137,39 @@ export default function IOChatApp() {
     }
   };
 
+  const handleToggleFavorite = async (targetUserId) => {
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
+        { favoriteUserId: targetUserId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setViewingUserProfile(prev => prev && prev.id === targetUserId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
+      fetchChats();
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      alert(err.response?.data?.error || "Failed to toggle favorite");
+    }
+  };
+
+  const handleToggleGroupFavorite = async (targetChatId) => {
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
+        { favoriteChatId: targetChatId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setViewingGroupProfile(prev => prev && prev.id === targetChatId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
+      fetchChats();
+    } catch (err) {
+      console.error("Error toggling group favorite:", err);
+      alert(err.response?.data?.error || "Failed to toggle favorite");
+    }
+  };
+
+  const activeChatIdRef = useRef(null);
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
   useEffect(() => {
     if (user && token) {
       fetchChats();
@@ -145,12 +179,16 @@ export default function IOChatApp() {
       setSocket(newSocket);
 
       newSocket.on('receive_message', (msg) => {
-        setMessages(prev => {
-          // If we received a message for the currently active chat
-          // wait, chat id matches? We need activeChatId inside the effect or use an updater pattern.
-          return [...prev, msg];
-        });
-        fetchChats(); // Refresh chat list order/last msg
+        if (msg.chat_id === activeChatIdRef.current) {
+          setMessages(prev => [...prev, msg]);
+          axios.post(`${BACKEND_URL}/api/chats/${activeChatIdRef.current}/read`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(() => {
+            fetchChats();
+          }).catch(err => console.error(err));
+        } else {
+          fetchChats();
+        }
       });
 
       return () => {
@@ -568,6 +606,15 @@ export default function IOChatApp() {
             {/* EXISTING CHATS */}
             {(() => {
               const filteredChats = chats.filter(chat => {
+                // First filter by tab selection
+                if (chatFilter === 'unread' && !(chat.unread_count > 0)) {
+                  return false;
+                }
+                if (chatFilter === 'favorites' && !chat.is_favorite) {
+                  return false;
+                }
+
+                // Then filter by search query
                 if (!chatSearchQuery) return true;
                 const searchLower = chatSearchQuery.toLowerCase();
                 const nameLower = (chat.name || '').toLowerCase();
@@ -579,7 +626,11 @@ export default function IOChatApp() {
                 filteredChats.map((chat) => (
                   <div 
                     key={chat.id}
-                    onClick={() => setActiveChatId(chat.id)}
+                    onClick={() => {
+                      setActiveChatId(chat.id);
+                      // Clear unread count locally for instant UI responsiveness
+                      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
+                    }}
                     className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
                       activeChatId === chat.id 
                         ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
@@ -592,9 +643,8 @@ export default function IOChatApp() {
                         if (chat.type === 'private' && chat.other_user_id) {
                           handleViewUserProfile(chat.other_user_id);
                         } else if (chat.type === 'group') {
-                           // For groups, maybe view group info?
-                           // For now, let's just open the chat
-                           setActiveChatId(chat.id);
+                          setViewingGroupProfile(chat);
+                          fetchChatMembers(chat.id);
                         }
                       }}
                       className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition"
@@ -603,8 +653,13 @@ export default function IOChatApp() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                        <h3 className={`font-semibold truncate flex items-center gap-1.5 ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
                           {chat.name || 'Private Chat'}
+                          {chat.is_favorite && (
+                            <svg className="w-3.5 h-3.5 text-yellow-500 fill-current shrink-0" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                          )}
                         </h3>
                         {chat.last_message_time && (
                           <span className="text-xs text-gray-400">
@@ -612,7 +667,14 @@ export default function IOChatApp() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
+                      <p className="text-sm text-gray-500 truncate dark:text-gray-400 flex items-center justify-between gap-2 mt-0.5">
+                        <span className="truncate">{chat.last_message || 'No messages yet'}</span>
+                        {chat.unread_count > 0 && (
+                          <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-red-600 rounded-full shrink-0 animate-pulse">
+                            {chat.unread_count}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -630,7 +692,17 @@ export default function IOChatApp() {
       {/* --- AREA CHAT KANAN --- */}
       <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
         
-        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" onClick={() => setShowInfoPanel(!showInfoPanel)}>
+        <div 
+          className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" 
+          onClick={() => {
+            if (activeChatData.type === 'group') {
+              setViewingGroupProfile(activeChatData);
+              fetchChatMembers(activeChatData.id);
+            } else {
+              setShowInfoPanel(!showInfoPanel);
+            }
+          }}
+        >
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -639,8 +711,8 @@ export default function IOChatApp() {
                 const otherMember = chatMembers.find(m => m.id !== user.id);
                 if (otherMember) handleViewUserProfile(otherMember.id);
               } else if (activeChatData.type === 'group') {
-                // Clicking group avatar shows panel
-                setShowInfoPanel(!showInfoPanel);
+                setViewingGroupProfile(activeChatData);
+                fetchChatMembers(activeChatData.id);
               }
             }}
             className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full hover:opacity-80 transition"
@@ -1006,6 +1078,84 @@ export default function IOChatApp() {
                     className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
                   >
                     Send Message
+                  </button>
+                  {/* Toggle Favorite Button */}
+                  {viewingUserProfile.id !== user.id && (
+                    <button 
+                      onClick={() => handleToggleFavorite(viewingUserProfile.id)}
+                      className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                        viewingUserProfile.is_favorite 
+                          ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
+                          : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                      }`}
+                      title={viewingUserProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      <svg className={`w-5 h-5 ${viewingUserProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                      </svg>
+                      {viewingUserProfile.is_favorite ? "Favorited" : "Favorite"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- GROUP PROFILE MODAL --- */}
+      {viewingGroupProfile && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingGroupProfile(null)}>
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="relative h-32 bg-gradient-to-r from-orange-500 to-red-600">
+              <button onClick={() => setViewingGroupProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div className="relative px-6 pb-8 text-center -mt-16 z-10">
+              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
+                {(viewingGroupProfile.name || 'G').charAt(0).toUpperCase()}
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingGroupProfile.name || 'Group Chat'}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{chatMembers.length} Members</p>
+              
+              <div className="text-left space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border border-gray-100 dark:border-gray-700 max-h-48 overflow-y-auto">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Group Members</label>
+                  <div className="space-y-2">
+                    {chatMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
+                        <span className="font-semibold">{member.username}</span>
+                        <span className="text-xs text-gray-400">{member.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setActiveChatId(viewingGroupProfile.id);
+                      setViewingGroupProfile(null);
+                    }}
+                    className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
+                  >
+                    Open Chat
+                  </button>
+                  {/* Toggle Group Favorite Button */}
+                  <button 
+                    onClick={() => handleToggleGroupFavorite(viewingGroupProfile.id)}
+                    className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
+                      viewingGroupProfile.is_favorite 
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
+                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
+                    }`}
+                    title={viewingGroupProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                  >
+                    <svg className={`w-5 h-5 ${viewingGroupProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                    </svg>
+                    {viewingGroupProfile.is_favorite ? "Favorited" : "Favorite"}
                   </button>
                 </div>
               </div>

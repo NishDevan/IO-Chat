@@ -19,7 +19,24 @@ export const getRecentChats = async (req, res) => {
                     WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
                     LIMIT 1) as other_user_id,
                    (SELECT CASE WHEN m.message_type = 'file' THEN '📎 File' ELSE m.content END FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-                   (SELECT created_at FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time
+                   (SELECT created_at FROM messages m WHERE m.chat_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time,
+                   (SELECT COUNT(*)::int
+                    FROM messages m
+                    LEFT JOIN read_receipts rr ON rr.message_id = m.id AND rr.user_id = $1
+                    WHERE m.chat_id = c.id AND m.sender_id != $1 AND rr.id IS NULL) as unread_count,
+                   EXISTS (
+                       SELECT 1 FROM favorites f
+                       WHERE f.user_id = $1 AND (
+                           (c.type = 'private' AND f.favorite_user_id = (
+                               SELECT cm2.user_id 
+                               FROM chat_members cm2 
+                               WHERE cm2.chat_id = c.id AND cm2.user_id != $1 
+                               LIMIT 1
+                           ))
+                           OR
+                           (c.type = 'group' AND f.favorite_chat_id = c.id)
+                       )
+                   ) as is_favorite
             FROM chats c
             JOIN chat_members cm ON cm.chat_id = c.id
             WHERE cm.user_id = $1
@@ -36,6 +53,21 @@ export const getRecentChats = async (req, res) => {
 export const getMessages = async (req, res) => {
     try {
         const { chatId } = req.params;
+        const userId = req.user.id;
+
+        // Auto mark as read on messages fetch
+        await query(
+            `INSERT INTO read_receipts (message_id, user_id)
+             SELECT m.id, $2
+             FROM messages m
+             WHERE m.chat_id = $1 AND m.sender_id != $2
+               AND NOT EXISTS (
+                   SELECT 1 FROM read_receipts rr 
+                   WHERE rr.message_id = m.id AND rr.user_id = $2
+               )`,
+            [chatId, userId]
+        );
+
         const result = await query(
             `SELECT m.*, a.file_url, a.file_type, a.file_size
              FROM messages m
@@ -46,6 +78,7 @@ export const getMessages = async (req, res) => {
         );
         res.json(result.rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Server error' });
     }
 };
@@ -143,6 +176,30 @@ export const getChatMembers = async (req, res) => {
         );
         res.json(result.rows);
     } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const markChatAsRead = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const userId = req.user.id;
+
+        await query(
+            `INSERT INTO read_receipts (message_id, user_id)
+             SELECT m.id, $2
+             FROM messages m
+             WHERE m.chat_id = $1 AND m.sender_id != $2
+               AND NOT EXISTS (
+                   SELECT 1 FROM read_receipts rr 
+                   WHERE rr.message_id = m.id AND rr.user_id = $2
+               )`,
+            [chatId, userId]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Server error' });
     }
 };
