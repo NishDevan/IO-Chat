@@ -15,14 +15,12 @@ export default function IOChatApp() {
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   
   const [user, setUser] = useState(null);
-  const [groupToEdit, setGroupToEdit] = useState(null);
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [token, setToken] = useState(null);
+  const [chats, setChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [socket, setSocket] = useState(null);
-  const [token, setToken] = useState("");
-  const [chats, setChats] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -46,10 +44,6 @@ export default function IOChatApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
 
-  // Theme States
-  const [selectedAccent, setSelectedAccent] = useState('red');
-  const [selectedWallpaper, setSelectedWallpaper] = useState('');
-
   // Auth Layout States
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -67,7 +61,6 @@ export default function IOChatApp() {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [chatMembers, setChatMembers] = useState([]);
   const [viewingUserProfile, setViewingUserProfile] = useState(null);
-  const [viewingGroupProfile, setViewingGroupProfile] = useState(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -126,23 +119,6 @@ export default function IOChatApp() {
     }
   };
 
-  const handleAddMembersToGroup = async () => {
-    if (selectedUsers.length === 0 || !groupToEdit) return;
-    try {
-      await axios.post(`${BACKEND_URL}/api/chats/group/${groupToEdit.id}/members`, 
-        { userIds: selectedUsers },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert("Members added successfully!");
-      setShowAddMemberModal(false);
-      setSelectedUsers([]);
-      setGroupToEdit(null);
-      fetchChatMembers(activeChatId);
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to add members");
-    }
-  };
-
   const toggleUserSelection = (userId) => {
     setSelectedUsers(prev => 
       prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
@@ -160,39 +136,6 @@ export default function IOChatApp() {
     }
   };
 
-  const handleToggleFavorite = async (targetUserId) => {
-    try {
-      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
-        { favoriteUserId: targetUserId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setViewingUserProfile(prev => prev && prev.id === targetUserId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
-      fetchChats();
-    } catch (err) {
-      console.error("Error toggling favorite:", err);
-      alert(err.response?.data?.error || "Failed to toggle favorite");
-    }
-  };
-
-  const handleToggleGroupFavorite = async (targetChatId) => {
-    try {
-      const res = await axios.post(`${BACKEND_URL}/api/auth/favorites/toggle`, 
-        { favoriteChatId: targetChatId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setViewingGroupProfile(prev => prev && prev.id === targetChatId ? { ...prev, is_favorite: res.data.isFavorite } : prev);
-      fetchChats();
-    } catch (err) {
-      console.error("Error toggling group favorite:", err);
-      alert(err.response?.data?.error || "Failed to toggle favorite");
-    }
-  };
-
-  const activeChatIdRef = useRef(null);
-  useEffect(() => {
-    activeChatIdRef.current = activeChatId;
-  }, [activeChatId]);
-
   useEffect(() => {
     if (user && token) {
       fetchChats();
@@ -202,16 +145,12 @@ export default function IOChatApp() {
       setSocket(newSocket);
 
       newSocket.on('receive_message', (msg) => {
-        if (msg.chat_id === activeChatIdRef.current) {
-          setMessages(prev => [...prev, msg]);
-          axios.post(`${BACKEND_URL}/api/chats/${activeChatIdRef.current}/read`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
-          }).then(() => {
-            fetchChats();
-          }).catch(err => console.error(err));
-        } else {
-          fetchChats();
-        }
+        setMessages(prev => {
+          // If we received a message for the currently active chat
+          // wait, chat id matches? We need activeChatId inside the effect or use an updater pattern.
+          return [...prev, msg];
+        });
+        fetchChats(); // Refresh chat list order/last msg
       });
 
       return () => {
@@ -273,9 +212,6 @@ export default function IOChatApp() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
-
-  // Handle Dynamic Accent Color
-  // Implementation removed per user request to fix initialization error
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -383,7 +319,7 @@ export default function IOChatApp() {
           <h2 className="mb-4 text-2xl font-bold dark:text-white text-center">
             I/O Chat Login
           </h2>
-          {errorMsg && <p className="mb-4 text-sm text-accent-500">{errorMsg}</p>}
+          {errorMsg && <p className="mb-4 text-sm text-red-500">{errorMsg}</p>}
           <form onSubmit={handleAuth} className="space-y-4">
             <input 
               type="email" 
@@ -408,7 +344,7 @@ export default function IOChatApp() {
               className="w-full p-2 border rounded text-black dark:bg-[#2a2a2a] dark:text-white dark:border-gray-700"
               required 
             />
-            <button type="submit" className="w-full p-2 text-white bg-accent-600 rounded hover:bg-accent-700">
+            <button type="submit" className="w-full p-2 text-white bg-red-600 rounded hover:bg-red-700">
               {isLogin ? "Login" : "Register"}
             </button>
           </form>
@@ -438,43 +374,6 @@ export default function IOChatApp() {
 
   const toggleSection = (key) => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const accentPalettes = {
-    red: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
-    blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
-    green: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
-    yellow: { 50: '#fefce8', 100: '#fef9c3', 200: '#fef08a', 300: '#fde047', 400: '#facc15', 500: '#eab308', 600: '#ca8a04', 700: '#a16207', 800: '#854d0e', 900: '#713f12' },
-    purple: { 50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe', 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce', 800: '#6b21a8', 900: '#581c87' },
-    pink: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f9a8d4', 400: '#f472b6', 500: '#ec4899', 600: '#db2777', 700: '#be185d', 800: '#9d174d', 900: '#831843' },
-    indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
-    teal: { 50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' },
-    orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12' },
-    cyan: { 50: '#ecfeff', 100: '#cffafe', 200: '#a5f3fc', 300: '#67e8f9', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490', 800: '#155e75', 900: '#164e63' },
-  };
-
-  const activePalette = accentPalettes[selectedAccent] || accentPalettes.red;
-  const themeVars = {
-    '--app-accent-50': activePalette[50],
-    '--app-accent-100': activePalette[100],
-    '--app-accent-200': activePalette[200],
-    '--app-accent-300': activePalette[300],
-    '--app-accent-400': activePalette[400],
-    '--app-accent-500': activePalette[500],
-    '--app-accent-600': activePalette[600],
-    '--app-accent-700': activePalette[700],
-    '--app-accent-800': activePalette[800],
-    '--app-accent-900': activePalette[900],
-  };
-
-  const wallpaperTemplates = [
-    { id: 'default', url: '' },
-    { id: 'w1', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w2', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w3', url: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=1920&auto=format&fit=crop' },
-    { id: 'w4', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=1920&auto=format&fit=crop' }
-  ];
-
-
-
   return (
     <div className={`flex h-screen font-sans transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
       
@@ -494,14 +393,14 @@ export default function IOChatApp() {
           {/* Chat / Messages Nav Icon */}
           <button 
             onClick={() => setCurrentView('chats')}
-            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'chats' ? 'text-accent-600 bg-accent-100 dark:bg-[#3d1c1c] dark:text-accent-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
+            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'chats' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20h1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
           </button>
           
           {/* Group Chat Nav Icon */}
           <button 
             onClick={() => setCurrentView('groups')}
-            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'groups' ? 'text-accent-600 bg-accent-100 dark:bg-[#3d1c1c] dark:text-accent-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
+            className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${currentView === 'groups' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
           </button>
 
@@ -523,14 +422,14 @@ export default function IOChatApp() {
           {/* Settings Nav Icon (General) */}
           <button 
             onClick={() => setCurrentView('settings')}
-            className={`w-12 h-12 flex items-center justify-center rounded-xl transition ${currentView === 'settings' ? 'text-accent-600 bg-accent-100 dark:bg-[#3d1c1c] dark:text-accent-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
+            className={`w-12 h-12 flex items-center justify-center rounded-xl transition ${currentView === 'settings' ? 'text-red-600 bg-red-100 dark:bg-[#3d1c1c] dark:text-red-400' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}>
              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.99l1.004.828c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
           </button>
 
           {/* User Avatar */}
           <div 
             onClick={() => handleViewUserProfile(user.id)}
-            className="flex items-center justify-center w-10 h-10 mt-2 text-sm font-bold text-white bg-accent-600 rounded-full shadow-md cursor-pointer hover:bg-accent-700 transition"
+            className="flex items-center justify-center w-10 h-10 mt-2 text-sm font-bold text-white bg-red-600 rounded-full shadow-md cursor-pointer hover:bg-red-700 transition"
           >
             {user.username.charAt(0).toUpperCase()}
           </div>
@@ -548,7 +447,7 @@ export default function IOChatApp() {
               <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Profile</h3>
               <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-accent-600 rounded-full shadow-md">
+                  <div className="flex items-center justify-center w-24 h-24 text-4xl font-bold text-white bg-red-600 rounded-full shadow-md">
                     {user.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -565,7 +464,7 @@ export default function IOChatApp() {
                       type="text" 
                       value={editUsername} 
                       onChange={(e) => setEditUsername(e.target.value)}
-                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
+                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-red-500"
                     />
                   </div>
                   <div>
@@ -574,11 +473,11 @@ export default function IOChatApp() {
                       type="text" 
                       value={editStatus} 
                       onChange={(e) => setEditStatus(e.target.value)}
-                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-accent-500"
+                      className="w-full p-2 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:outline-none focus:border-red-500"
                       placeholder="Enter your status"
                     />
                   </div>
-                  <button type="submit" className="px-4 py-2 bg-accent-600 text-white font-bold rounded-lg hover:bg-accent-700 transition">
+                  <button type="submit" className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition">
                     Save Changes
                   </button>
                 </form>
@@ -588,44 +487,17 @@ export default function IOChatApp() {
             {/* Chat Settings Section */}
             <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
               <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Chat Settings</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Chat Wallpaper</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {wallpaperTemplates.map(wp => (
-                      <div 
-                        key={wp.id} 
-                        onClick={() => setSelectedWallpaper(wp.url)}
-                        className={`aspect-video rounded-lg cursor-pointer overflow-hidden border-2 transition-all ${selectedWallpaper === wp.url ? 'border-accent-600 scale-105 shadow-md' : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'}`}
-                      >
-                        {wp.url ? (
-                          <img src={wp.url} alt="wallpaper" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-[#e8e6e1] dark:bg-[#121212] flex items-center justify-center">
-                            <span className="text-xs text-gray-500">Default</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Chat Wallpaper</span>
+                  <button className="text-sm text-red-600 font-medium hover:underline">Change</button>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Accent Color</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {Object.keys(accentPalettes).map(color => (
-                      <div 
-                        key={color}
-                        onClick={() => setSelectedAccent(color)}
-                        className={`w-8 h-8 rounded-full cursor-pointer transition-transform ${selectedAccent === color ? 'ring-2 ring-offset-2 ring-accent-500 dark:ring-offset-[#1e1e1e] scale-110' : 'hover:scale-110'}`}
-                        style={{ backgroundColor: accentPalettes[color][500] }}
-                        title={color.charAt(0).toUpperCase() + color.slice(1)}
-                      ></div>
-                    ))}
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 dark:text-gray-300">Accent Color</span>
+                  <div className="flex gap-2">
+                    <div className="w-6 h-6 rounded-full bg-red-600 cursor-pointer ring-2 ring-offset-2 ring-red-200 dark:ring-red-900"></div>
+                    <div className="w-6 h-6 rounded-full bg-blue-600 cursor-pointer"></div>
+                    <div className="w-6 h-6 rounded-full bg-green-600 cursor-pointer"></div>
                   </div>
                 </div>
               </div>
@@ -642,7 +514,7 @@ export default function IOChatApp() {
 
             {/* Logout */}
             <div className="bg-white dark:bg-[#1e1e1e] rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-               <button onClick={logout} className="w-full py-3 text-accent-600 bg-accent-50 dark:bg-accent-500/10 font-bold rounded-lg hover:bg-accent-100 dark:hover:bg-accent-500/20 transition">Log Out</button>
+               <button onClick={logout} className="w-full py-3 text-red-600 bg-red-50 dark:bg-red-500/10 font-bold rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 transition">Log Out</button>
             </div>
           </div>
         </div>
@@ -652,39 +524,12 @@ export default function IOChatApp() {
           <div className="flex flex-col w-72 md:w-80 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-800 transition-colors">
             <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-800 dark:text-white">Groups</h2>
-              <button onClick={() => { setShowNewChatModal(true); handleSearchUsers(""); }} className="w-8 h-8 flex items-center justify-center bg-accent-50 text-accent-600 rounded-full hover:bg-accent-100 dark:bg-[#3d1c1c] dark:hover:bg-accent-900 transition">
+              <button onClick={() => { setShowNewChatModal(true); handleSearchUsers(""); }} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-full hover:bg-red-100 dark:bg-[#3d1c1c] dark:hover:bg-red-900 transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {(() => {
-                const groupChats = chats.filter(chat => chat.type === 'group');
-                return groupChats.length > 0 ? (
-                  groupChats.map(group => (
-                    <div
-                      key={group.id}
-                      className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${activeChatId === group.id ? 'bg-accent-50 dark:bg-[#3d1c1c] border-accent-100 dark:border-accent-900' : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'}`}
-                      onClick={() => setActiveChatId(group.id)}
-                    >
-                      <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition">
-                        {(group.name || 'G').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold truncate text-gray-800 dark:text-gray-200">{group.name || 'Group Chat'}</h3>
-                          <button
-                            className="text-xs px-2 py-1 bg-accent-100 text-accent-600 rounded hover:bg-accent-200 transition"
-                            onClick={(e) => { e.stopPropagation(); setGroupToEdit(group); setShowAddMemberModal(true); }}
-                          >Add Members</button>
-                        </div>
-                        <p className="text-sm text-gray-500 truncate dark:text-gray-400">{group.last_message || 'No messages yet'}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">No groups found.</div>
-                );
-              })()}
+            <div className="flex-1 overflow-y-auto p-4 text-center text-sm text-gray-500">
+              No groups created yet.
             </div>
           </div>
         ) : (
@@ -695,7 +540,7 @@ export default function IOChatApp() {
               <h2 className="text-xl font-bold text-gray-800 dark:text-white">Messages</h2>
               <button 
                 onClick={() => { setShowNewChatModal(true); handleSearchUsers(""); }}
-                className="w-8 h-8 flex items-center justify-center bg-accent-50 text-accent-600 rounded-full hover:bg-accent-100 dark:bg-[#3d1c1c] dark:hover:bg-accent-900 transition"
+                className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-full hover:bg-red-100 dark:bg-[#3d1c1c] dark:hover:bg-red-900 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
               </button>
@@ -707,7 +552,7 @@ export default function IOChatApp() {
                 placeholder="Search chats..." 
                 value={chatSearchQuery}
                 onChange={(e) => setChatSearchQuery(e.target.value)}
-                className="w-full p-2 pl-8 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-accent-500 dark:focus:border-accent-500 font-medium"
+                className="w-full p-2 pl-8 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-lg dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
               />
               <svg className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
@@ -723,15 +568,6 @@ export default function IOChatApp() {
             {/* EXISTING CHATS */}
             {(() => {
               const filteredChats = chats.filter(chat => {
-                // First filter by tab selection
-                if (chatFilter === 'unread' && !(chat.unread_count > 0)) {
-                  return false;
-                }
-                if (chatFilter === 'favorites' && !chat.is_favorite) {
-                  return false;
-                }
-
-                // Then filter by search query
                 if (!chatSearchQuery) return true;
                 const searchLower = chatSearchQuery.toLowerCase();
                 const nameLower = (chat.name || '').toLowerCase();
@@ -743,14 +579,10 @@ export default function IOChatApp() {
                 filteredChats.map((chat) => (
                   <div 
                     key={chat.id}
-                    onClick={() => {
-                      setActiveChatId(chat.id);
-                      // Clear unread count locally for instant UI responsiveness
-                      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread_count: 0 } : c));
-                    }}
+                    onClick={() => setActiveChatId(chat.id)}
                     className={`flex items-center gap-3 p-4 border-b cursor-pointer transition-colors ${
                       activeChatId === chat.id 
-                        ? 'bg-accent-50 dark:bg-[#3d1c1c] border-accent-100 dark:border-accent-900' 
+                        ? 'bg-red-50 dark:bg-[#3d1c1c] border-red-100 dark:border-red-900' 
                         : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] border-gray-100 dark:border-gray-800'
                     }`}
                   >
@@ -760,8 +592,9 @@ export default function IOChatApp() {
                         if (chat.type === 'private' && chat.other_user_id) {
                           handleViewUserProfile(chat.other_user_id);
                         } else if (chat.type === 'group') {
-                          setViewingGroupProfile(chat);
-                          fetchChatMembers(chat.id);
+                           // For groups, maybe view group info?
+                           // For now, let's just open the chat
+                           setActiveChatId(chat.id);
                         }
                       }}
                       className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full shrink-0 hover:bg-gray-500 transition"
@@ -770,17 +603,8 @@ export default function IOChatApp() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-<<<<<<< HEAD
-                        <h3 className={`font-semibold truncate flex items-center gap-1.5 ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
-=======
-                        <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-accent-700 dark:text-accent-400' : 'text-gray-800 dark:text-gray-200'}`}>
->>>>>>> d4c2a03b501d39a2e593aaa44b3633e808c5e9f3
+                        <h3 className={`font-semibold truncate ${activeChatId === chat.id ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
                           {chat.name || 'Private Chat'}
-                          {chat.is_favorite && (
-                            <svg className="w-3.5 h-3.5 text-yellow-500 fill-current shrink-0" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                            </svg>
-                          )}
                         </h3>
                         {chat.last_message_time && (
                           <span className="text-xs text-gray-400">
@@ -788,14 +612,7 @@ export default function IOChatApp() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 truncate dark:text-gray-400 flex items-center justify-between gap-2 mt-0.5">
-                        <span className="truncate">{chat.last_message || 'No messages yet'}</span>
-                        {chat.unread_count > 0 && (
-                          <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-red-600 rounded-full shrink-0 animate-pulse">
-                            {chat.unread_count}
-                          </span>
-                        )}
-                      </p>
+                      <p className="text-sm text-gray-500 truncate dark:text-gray-400">{chat.last_message || 'No messages yet'}</p>
                     </div>
                   </div>
                 ))
@@ -811,22 +628,9 @@ export default function IOChatApp() {
         )}
 
       {/* --- AREA CHAT KANAN --- */}
-      <div 
-        className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors bg-cover bg-center"
-        style={selectedWallpaper ? { backgroundImage: `url(${selectedWallpaper})` } : {}}
-      >
+      <div className="flex flex-col flex-1 bg-[#e8e6e1] dark:bg-[#121212] transition-colors">
         
-        <div 
-          className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" 
-          onClick={() => {
-            if (activeChatData.type === 'group') {
-              setViewingGroupProfile(activeChatData);
-              fetchChatMembers(activeChatData.id);
-            } else {
-              setShowInfoPanel(!showInfoPanel);
-            }
-          }}
-        >
+        <div className="flex items-center gap-3 p-4 shadow-sm bg-white/50 dark:bg-[#1e1e1e]/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 cursor-pointer" onClick={() => setShowInfoPanel(!showInfoPanel)}>
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -835,8 +639,8 @@ export default function IOChatApp() {
                 const otherMember = chatMembers.find(m => m.id !== user.id);
                 if (otherMember) handleViewUserProfile(otherMember.id);
               } else if (activeChatData.type === 'group') {
-                setViewingGroupProfile(activeChatData);
-                fetchChatMembers(activeChatData.id);
+                // Clicking group avatar shows panel
+                setShowInfoPanel(!showInfoPanel);
               }
             }}
             className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-gray-400 rounded-full hover:opacity-80 transition"
@@ -853,7 +657,7 @@ export default function IOChatApp() {
             <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-md p-3 shadow-sm rounded-xl ${
                 msg.sender_id === user.id 
-                  ? 'bg-accent-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
+                  ? 'bg-red-100 text-gray-800 dark:bg-[#6b2727] dark:text-white rounded-tr-sm' 
                   : 'bg-white text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 rounded-tl-sm'
               }`}>
                 {msg.message_type === 'file' ? (
@@ -869,7 +673,7 @@ export default function IOChatApp() {
                     </div>
                   ) : (
                     <a href={msg.content} download={msg.file_url || 'file'} className="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition cursor-pointer no-underline">
-                      <div className="w-10 h-10 flex items-center justify-center bg-accent-100 dark:bg-accent-900/40 text-accent-600 dark:text-accent-400 rounded-lg text-xs font-bold">
+                      <div className="w-10 h-10 flex items-center justify-center bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold">
                         {(msg.file_url || 'FILE').split('.').pop().toUpperCase().slice(0,4)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -901,26 +705,26 @@ export default function IOChatApp() {
                   className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = 'image/*'; fileInputRef.current.click(); }}
                 >
-                  <svg className="w-5 h-5 mr-3 text-accent-600 dark:text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                   Image
                 </button>
                 <button 
                   className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition border-t border-gray-100 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
                   onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = 'video/*'; fileInputRef.current.click(); }}
                 >
-                  <svg className="w-5 h-5 mr-3 text-accent-600 dark:text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                  <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                   Video
                 </button>
                 <button 
                   className="flex items-center w-full px-4 py-3 text-sm text-gray-700 transition border-t border-gray-100 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
                   onClick={() => { setShowAttachMenu(false); fileInputRef.current.accept = '*/*'; fileInputRef.current.click(); }}
                 >
-                  <svg className="w-5 h-5 mr-3 text-accent-600 dark:text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  <svg className="w-5 h-5 mr-3 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                   Document
                 </button>
               </div>
             )}
-            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className={`p-2 transition ${uploadingFile ? 'text-accent-500 animate-pulse' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`} disabled={uploadingFile}>
+            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className={`p-2 transition ${uploadingFile ? 'text-red-500 animate-pulse' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`} disabled={uploadingFile}>
               <svg className="w-6 h-6 transform -rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
             </button>
           </div>
@@ -930,11 +734,11 @@ export default function IOChatApp() {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            className="flex-1 p-3 text-gray-800 transition-colors bg-white border border-gray-300 rounded-lg dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-white focus:outline-none focus:border-accent-600 dark:focus:border-accent-500" 
+            className="flex-1 p-3 text-gray-800 transition-colors bg-white border border-gray-300 rounded-lg dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-white focus:outline-none focus:border-red-600 dark:focus:border-red-500" 
             placeholder="Type a message"
           />
           
-          <button onClick={handleSendMessage} className="p-3 text-white transition bg-accent-600 rounded-full dark:bg-accent-700 hover:bg-accent-700 dark:hover:bg-accent-600">
+          <button onClick={handleSendMessage} className="p-3 text-white transition bg-red-600 rounded-full dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
           </button>
         </div>
@@ -1016,12 +820,12 @@ export default function IOChatApp() {
               <div className="px-4 pb-4 space-y-3">
                 {sharedFiles.length > 0 ? sharedFiles.map((f, idx) => (
                   <div key={idx} className="flex items-center gap-3">
-                    <div className="w-10 h-10 flex items-center justify-center bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 rounded-md text-sm font-semibold">{(f.ext || 'F').slice(0,3).toUpperCase()}</div>
+                    <div className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-md text-sm font-semibold">{(f.ext || 'F').slice(0,3).toUpperCase()}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{f.name}</div>
                       <div className="text-xs text-gray-400">{formatFileSize(f.size)}</div>
                     </div>
-                    <a href={f.url} download={f.name} className="text-xs text-accent-600 hover:underline">Download</a>
+                    <a href={f.url} download={f.name} className="text-xs text-red-600 hover:underline">Download</a>
                   </div>
                 )) : (
                   <div className="text-xs text-gray-400 text-center py-2">No files shared</div>
@@ -1039,7 +843,7 @@ export default function IOChatApp() {
             {expandedSections.links && (
               <div className="px-4 pb-4 space-y-3">
                 {sharedLinks.length > 0 ? sharedLinks.map((l, idx) => (
-                  <a key={idx} href={l} target="_blank" rel="noreferrer" className="block text-sm text-accent-600 hover:underline truncate">
+                  <a key={idx} href={l} target="_blank" rel="noreferrer" className="block text-sm text-red-600 hover:underline truncate">
                     {l}
                   </a>
                 )) : (
@@ -1059,7 +863,7 @@ export default function IOChatApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-opacity">
           <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[80vh] overflow-hidden">
             <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800 dark:white">New Chat</h3>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">New Chat</h3>
               <button onClick={() => setShowNewChatModal(false)} className="p-1 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
@@ -1068,14 +872,12 @@ export default function IOChatApp() {
             <div className="p-4 border-b border-gray-200 dark:border-gray-800">
               <button 
                 onClick={() => setIsCreatingGroup(!isCreatingGroup)}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl transition font-medium ${isCreatingGroup ? 'bg-accent-600 text-white hover:bg-accent-700' : 'bg-accent-50 dark:bg-[#3d1c1c] text-accent-600 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/60'}`}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl transition font-medium ${isCreatingGroup ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 dark:bg-[#3d1c1c] text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60'}`}
               >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                   {isCreatingGroup ? "Cancel Group Creation" : "Create New Group"}
               </button>
             </div>
-
-            {/* User Search for Private Chat or Adding to new Group */}
 
             {isCreatingGroup && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
@@ -1084,14 +886,14 @@ export default function IOChatApp() {
                   placeholder="Group Name" 
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  className="w-full p-3 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-accent-500 dark:focus:border-accent-500 font-medium"
+                  className="w-full p-3 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
                 />
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-500 uppercase">{selectedUsers.length} Selected (Max 50)</span>
                   <button 
                     onClick={createGroup}
                     disabled={selectedUsers.length === 0 || !groupName}
-                    className="px-4 py-1.5 bg-accent-600 text-white text-xs font-bold rounded-lg hover:bg-accent-700 disabled:opacity-50"
+                    className="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
                   >
                     Create Group
                   </button>
@@ -1106,7 +908,7 @@ export default function IOChatApp() {
                   placeholder="Search username or email (@gmail, etc)..." 
                   value={searchQuery}
                   onChange={(e) => handleSearchUsers(e.target.value)}
-                  className="w-full p-3 pl-10 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-accent-500 dark:focus:border-accent-500 font-medium"
+                  className="w-full p-3 pl-10 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-red-500 dark:focus:border-red-500 font-medium"
                 />
                 <svg className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
@@ -1126,7 +928,7 @@ export default function IOChatApp() {
                   }} 
                   className={`flex items-center gap-3 p-3 transition-colors rounded-xl mb-1 cursor-pointer ${
                     isCreatingGroup && selectedUsers.includes(sUser.id)
-                    ? 'bg-accent-50 dark:bg-[#3d1c1c] border border-accent-200 dark:border-accent-900'
+                    ? 'bg-red-50 dark:bg-[#3d1c1c] border border-red-200 dark:border-red-900'
                     : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
                   }`}
                 >
@@ -1135,7 +937,7 @@ export default function IOChatApp() {
                       e.stopPropagation();
                       handleViewUserProfile(sUser.id);
                     }}
-                    className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-accent-600 rounded-full shrink-0 hover:bg-accent-700 transition"
+                    className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-red-600 rounded-full shrink-0 hover:bg-red-700 transition"
                   >
                     {sUser.username.charAt(0).toUpperCase()}
                   </div>
@@ -1145,7 +947,7 @@ export default function IOChatApp() {
                   </div>
                   {isCreatingGroup && (
                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                      selectedUsers.includes(sUser.id) ? 'bg-accent-600 border-accent-600' : 'border-gray-300 dark:border-gray-600'
+                      selectedUsers.includes(sUser.id) ? 'bg-red-600 border-red-600' : 'border-gray-300 dark:border-gray-600'
                     }`}>
                       {selectedUsers.includes(sUser.id) && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>}
                     </div>
@@ -1171,88 +973,17 @@ export default function IOChatApp() {
         </div>
       )}
 
-      {/* --- ADD MEMBER TO GROUP MODAL --- */}
-      {showAddMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[80vh] overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-accent-600 text-white">
-              <div>
-                <h3 className="text-lg font-bold">Add Members</h3>
-                <p className="text-xs opacity-80">Adding to {groupToEdit?.name}</p>
-              </div>
-              <button onClick={() => { setShowAddMemberModal(false); setSelectedUsers([]); setGroupToEdit(null); }} className="p-1 hover:bg-white/20 rounded-full transition">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-            
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search user to add..." 
-                  value={searchQuery}
-                  onChange={(e) => handleSearchUsers(e.target.value)}
-                  className="w-full p-3 pl-10 text-sm text-gray-800 transition-colors bg-gray-100 border border-transparent rounded-xl dark:bg-[#2a2a2a] dark:text-gray-200 focus:outline-none focus:bg-white dark:focus:bg-[#1e1e1e] focus:border-accent-500 dark:focus:border-accent-500 font-medium"
-                />
-                <svg className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-500 uppercase">{selectedUsers.length} Selected</span>
-                <button 
-                  onClick={handleAddMembersToGroup}
-                  disabled={selectedUsers.length === 0}
-                  className="px-6 py-2 bg-accent-600 text-white text-sm font-bold rounded-xl hover:bg-accent-700 disabled:opacity-50 shadow-md transition"
-                >
-                  Add to Group
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2">
-              {searchResults.length > 0 ? searchResults.map(sUser => (
-                <div 
-                  key={sUser.id} 
-                  onClick={() => toggleUserSelection(sUser.id)} 
-                  className={`flex items-center gap-3 p-3 transition-colors rounded-xl mb-1 cursor-pointer ${
-                    selectedUsers.includes(sUser.id)
-                    ? 'bg-accent-50 dark:bg-[#3d1c1c] border border-accent-200 dark:border-accent-900'
-                    : 'bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white bg-accent-600 rounded-full shrink-0">
-                    {sUser.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">{sUser.username}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{sUser.email}</p>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                    selectedUsers.includes(sUser.id) ? 'bg-accent-600 border-accent-600' : 'border-gray-300 dark:border-gray-600'
-                  }`}>
-                    {selectedUsers.includes(sUser.id) && <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>}
-                  </div>
-                </div>
-              )) : (
-                <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
-                  {searchQuery ? "No users found." : "Type a name to search"}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* --- USER PROFILE MODAL --- */}
       {viewingUserProfile && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingUserProfile(null)}>
           <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="relative h-32 bg-gradient-to-r from-accent-500 to-accent-700">
+            <div className="relative h-32 bg-gradient-to-r from-red-500 to-red-700">
               <button onClick={() => setViewingUserProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
             <div className="relative px-6 pb-8 text-center -mt-16 z-10">
-              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-accent-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
+              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
                 {viewingUserProfile.username.charAt(0).toUpperCase()}
               </div>
               <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingUserProfile.username}</h3>
@@ -1272,87 +1003,9 @@ export default function IOChatApp() {
                       startChat(viewingUserProfile.id);
                       setViewingUserProfile(null);
                     }}
-                    className="flex-1 py-3 bg-accent-600 text-white font-bold rounded-xl hover:bg-accent-700 transition"
-                  >
-                    Send Message
-                  </button>
-                  {/* Toggle Favorite Button */}
-                  {viewingUserProfile.id !== user.id && (
-                    <button 
-                      onClick={() => handleToggleFavorite(viewingUserProfile.id)}
-                      className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
-                        viewingUserProfile.is_favorite 
-                          ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
-                          : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
-                      }`}
-                      title={viewingUserProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
-                    >
-                      <svg className={`w-5 h-5 ${viewingUserProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                      </svg>
-                      {viewingUserProfile.is_favorite ? "Favorited" : "Favorite"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- GROUP PROFILE MODAL --- */}
-      {viewingGroupProfile && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setViewingGroupProfile(null)}>
-          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="relative h-32 bg-gradient-to-r from-orange-500 to-red-600">
-              <button onClick={() => setViewingGroupProfile(null)} className="absolute top-4 right-4 p-1.5 text-white bg-black/20 hover:bg-black/40 rounded-full transition">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-            <div className="relative px-6 pb-8 text-center -mt-16 z-10">
-              <div className="inline-flex items-center justify-center w-32 h-32 text-5xl font-bold text-white bg-red-600 border-4 border-white dark:border-[#1e1e1e] rounded-full shadow-lg mb-4 relative z-20">
-                {(viewingGroupProfile.name || 'G').charAt(0).toUpperCase()}
-              </div>
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">{viewingGroupProfile.name || 'Group Chat'}</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{chatMembers.length} Members</p>
-              
-              <div className="text-left space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border border-gray-100 dark:border-gray-700 max-h-48 overflow-y-auto">
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Group Members</label>
-                  <div className="space-y-2">
-                    {chatMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
-                        <span className="font-semibold">{member.username}</span>
-                        <span className="text-xs text-gray-400">{member.email}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setActiveChatId(viewingGroupProfile.id);
-                      setViewingGroupProfile(null);
-                    }}
                     className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
                   >
-                    Open Chat
-                  </button>
-                  {/* Toggle Group Favorite Button */}
-                  <button 
-                    onClick={() => handleToggleGroupFavorite(viewingGroupProfile.id)}
-                    className={`px-4 py-3 font-bold rounded-xl border transition flex items-center justify-center gap-1.5 ${
-                      viewingGroupProfile.is_favorite 
-                        ? 'bg-yellow-50 border-yellow-200 text-yellow-600 dark:bg-yellow-950/20 dark:border-yellow-900/50 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/30' 
-                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-[#2a2a2a] dark:border-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#343434]'
-                    }`}
-                    title={viewingGroupProfile.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
-                  >
-                    <svg className={`w-5 h-5 ${viewingGroupProfile.is_favorite ? 'fill-current text-yellow-500' : 'stroke-current fill-none'}`} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                    </svg>
-                    {viewingGroupProfile.is_favorite ? "Favorited" : "Favorite"}
+                    Send Message
                   </button>
                 </div>
               </div>

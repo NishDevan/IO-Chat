@@ -179,6 +179,7 @@ export const getChatMembers = async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+<<<<<<< HEAD
 
 export const markChatAsRead = async (req, res) => {
     try {
@@ -200,6 +201,41 @@ export const markChatAsRead = async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
+=======
+export const addGroupMembers = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const { userIds } = req.body;
+
+        if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(400).json({ error: 'At least one member is required' });
+        }
+
+        const chatRes = await query("SELECT type FROM chats WHERE id = $1", [chatId]);
+        if (chatRes.rows.length === 0) return res.status(404).json({ error: 'Chat not found' });
+        if (chatRes.rows[0].type !== 'group') return res.status(400).json({ error: 'Not a group chat' });
+
+        const existingMembers = await query(
+            "SELECT user_id FROM chat_members WHERE chat_id = $1",
+            [chatId]
+        );
+        const existingUserIds = existingMembers.rows.map(m => m.user_id);
+        const newUserIds = userIds.filter(id => !existingUserIds.includes(parseInt(id)));
+
+        if (newUserIds.length === 0) {
+            return res.status(400).json({ error: 'All selected users are already members' });
+        }
+
+        const values = newUserIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+        await query(
+            `INSERT INTO chat_members (chat_id, user_id) VALUES ${values}`,
+            [chatId, ...newUserIds]
+        );
+
+        res.json({ message: 'Members added successfully' });
+    } catch (err) {
+        console.error('addGroupMembers error:', err);
+>>>>>>> d4c2a03b501d39a2e593aaa44b3633e808c5e9f3
         res.status(500).json({ error: 'Server error' });
     }
 };
