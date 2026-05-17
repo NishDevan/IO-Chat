@@ -1,6 +1,6 @@
-# I/O Chat — Real-time Chat (Frontend + Backend)
+# I/O Chat — Real-time Chat
 
-Simple real-time chat application (Next.js frontend + Express + PostgreSQL + Redis backend). Repo ini berisi dua bagian utama: IO-Chat-Frontend dan IO-Chat-Backend.
+Simple real-time chat application (Next.js frontend + Express + PostgreSQL + Redis backend). with JWT auth, private/group chats, file sharing , and real-time messaging via Socket.IO.
 
 ---
 
@@ -11,8 +11,6 @@ I/O Chat is a small real-time chat system that supports:
 - File sharing (small files, client-enforced 2MB limit)
 - Authentication using JWT
 - PostgreSQL as primary DB; Redis for presence
-
-This repository is used as a student final project for the Database Systems practicum.
 
 ---
 
@@ -105,11 +103,5 @@ A SQL dump is available: database_dump.sql. Use it to create the tables. The dum
  
 - Flowchart (user flow)
   <img width="4476" height="3046" alt="FLOWCHART SBD" src="https://github.com/user-attachments/assets/aa991db4-623e-42cd-a110-f6f4a504fe94" />
-
----
-
-## Contact / Authors
-- Project: IO-Chat (contributors listed in repo)
-- For practicum questions: contact project mentor / aslab as per course instructions.
 
 ---
