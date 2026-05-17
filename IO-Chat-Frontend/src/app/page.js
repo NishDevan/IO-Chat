@@ -713,22 +713,7 @@ export default function IOChatApp() {
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Accent Color</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {Object.keys(accentPalettes).map(color => (
-                      <div 
-                        key={color}
-                        onClick={() => setSelectedAccent(color)}
-                        className={`w-8 h-8 rounded-full cursor-pointer transition-transform ${selectedAccent === color ? 'ring-2 ring-offset-2 ring-accent-500 dark:ring-offset-[#1e1e1e] scale-110' : 'hover:scale-110'}`}
-                        style={{ backgroundColor: accentPalettes[color][500] }}
-                        title={color.charAt(0).toUpperCase() + color.slice(1)}
-                      ></div>
-                    ))}
-                  </div>
-                </div>
+
               </div>
             </div>
 
